@@ -15,7 +15,35 @@ class ELF
 			throw "This is not ELF Format File"
 		end
 		@pos_entry = 24			# e_entry offset pos
+		@sh_idx_map = {}				# セクションヘッダインデックスマップ
 		read_elf_header
+	end
+
+	def initialize_section_idx_map
+		sec_idx = 0
+		while sec_idx < @e_shnum
+			sec_pos = @e_shoff + (sec_idx * @sh_size)
+			section = @bin[sec_pos, @sh_size]
+			sec_idx += 1
+
+			# .shstrtabにおけるセクション名のオフセット位置を取得
+			name_offset = section[0, SIZE_WORD].to_i
+			name = @names_section[name_offset, @names_sec_length].c_str
+
+			# セクションヘッダのインデックスを設定
+			@sh_idx_map[name] = sec_idx
+		end
+	end
+
+	# 指定されたセクション名のセクションヘッダ情報を取得
+	def get_section_header section_name
+		sec_idx = @sh_idx_map[section_name]
+
+		# 該当セクションなし
+		throw "no such section" if sec_idx.nil?
+
+		sec_pos = @e_shoff + (sec_idx * @sh_size)
+		@bin[sec_pos, @sh_size]
 	end
 
 	def read_elf_header
@@ -37,6 +65,13 @@ class ELF
 		read_sh_num
 		read_shs_idx
 		read_sections
+		initialize_section_idx_map
+		debug_section = get_section_header ".debug_info"
+		show_section_header debug_section
+	end
+
+	# セクションヘッダの内容を出力
+	def show_section_header section_header
 	end
 
 	def read_elf_class
@@ -186,15 +221,15 @@ class ELF
 		puts "offset_pos:#{offset_pos}"
 		sh_offset = sh_name[offset_pos, @addr_size].to_i
 		size_pos = offset_pos + @addr_size
-		sh_size = sh_name[size_pos, sh_size_size].to_i
-		puts "sh_offset:#{sh_offset.to_h}, sh_size:#{sh_size.to_h}"
-		names_section = @bin[sh_offset, sh_size]
+		@names_sec_length = sh_name[size_pos, sh_size_size].to_i
+		puts "sh_offset:#{sh_offset.to_h}, names_section_length:#{@names_sec_length.to_h}"
+		@names_section = @bin[sh_offset, @names_sec_length]
 		pos = 0
-		lengh = names_section.length
-		until lengh <= pos do
-			name = names_section[pos, lengh].c_str
+		until @names_sec_length <= pos do
+			name = @names_section[pos, @names_sec_length].c_str
 			puts name
-			pos += name.length + 1
+			pos += name.length
+			pos += 1
 		end
 	end
 
