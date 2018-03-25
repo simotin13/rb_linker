@@ -3,7 +3,7 @@ require './machine_arch_list'
 
 class ELF
 	SIZE_IDENT			= 16
-	SIZE_HARF_WORD	= 2
+	SIZE_HALF_WORD	= 2
 	SIZE_WORD				= 4
 	SIZE_XWORD			= 8
 	SIZE_ADDR_32		= 4
@@ -139,11 +139,11 @@ class ELF
 		@pos_shoff = @pos_phoff  + @addr_size
 		@pos_eflags = @pos_shoff + @addr_size
 		@pos_ehsize = @pos_eflags + SIZE_WORD
-		@pos_phsize_offset = @pos_ehsize + SIZE_HARF_WORD
-		@pos_phnum_offset = @pos_phsize_offset + SIZE_HARF_WORD
-		@pos_shsize_offset = @pos_phnum_offset + SIZE_HARF_WORD
-		@pos_shnum_offset = @pos_shsize_offset + SIZE_HARF_WORD
-		@pos_shstrndx = @pos_shnum_offset + SIZE_HARF_WORD
+		@pos_phsize_offset = @pos_ehsize + SIZE_HALF_WORD
+		@pos_phnum_offset = @pos_phsize_offset + SIZE_HALF_WORD
+		@pos_shsize_offset = @pos_phnum_offset + SIZE_HALF_WORD
+		@pos_shnum_offset = @pos_shsize_offset + SIZE_HALF_WORD
+		@pos_shstrndx = @pos_shnum_offset + SIZE_HALF_WORD
 
 		puts "entry point address		:#{@e_entry.to_h}"
 	end
@@ -164,32 +164,32 @@ class ELF
 	end
 
 	def read_eh_size
-		@eh_size = @bin[@pos_ehsize, SIZE_HARF_WORD].to_i
+		@eh_size = @bin[@pos_ehsize, SIZE_HALF_WORD].to_i
 		puts "elf header size			:#{@eh_size}"
 	end
 
 	def read_ph_size
-		@ph_size = @bin[@pos_phsize_offset, SIZE_HARF_WORD].to_i
+		@ph_size = @bin[@pos_phsize_offset, SIZE_HALF_WORD].to_i
 		puts "program header size		:#{@ph_size}"
 	end
 
 	def read_ph_num
-		@e_phnum = @bin[@pos_phnum_offset, SIZE_HARF_WORD].to_i
+		@e_phnum = @bin[@pos_phnum_offset, SIZE_HALF_WORD].to_i
 		puts "program header entry number	:#{@e_phnum}"
 	end
 
 	def read_sh_size
-		@sh_size = @bin[@pos_shsize_offset, SIZE_HARF_WORD].to_i
+		@sh_size = @bin[@pos_shsize_offset, SIZE_HALF_WORD].to_i
 		puts "section header size 		:#{@sh_size}"
 	end
 
 	def read_sh_num
-		@e_shnum = @bin[@pos_shnum_offset, SIZE_HARF_WORD].to_i
+		@e_shnum = @bin[@pos_shnum_offset, SIZE_HALF_WORD].to_i
 		puts "section header entry number	:#{@e_shnum}"
 	end
 
 	def read_shs_idx
-		 @shs_idx = @bin[@pos_shstrndx, SIZE_HARF_WORD].to_i
+		 @shs_idx = @bin[@pos_shstrndx, SIZE_HALF_WORD].to_i
 		 puts "section name strings section	:#{@shs_idx}"
 	end
 
