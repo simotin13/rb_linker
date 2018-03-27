@@ -69,14 +69,20 @@ class ELF
 	ELF_ET_DYN	= 3
 	ELF_ET_CORE	= 4
 
-	# Spacer
+	# ============================================================================
+	# Construster
+	# - Load Object File to memory.
+	# ============================================================================
+	def initialize filepath
+		load(filepath)
+	end
 
 	# ============================================================================
 	# Load Object File
+	# - Check if valid ELF and set elf infos.
 	# ============================================================================
 	def load filepath
 		bin = File.binread(filepath).unpack("C*")
-
 		elf_ident = bin[0, ELF_IDENT_SIZE]
 
 		# check magic number
@@ -324,38 +330,65 @@ class ELF
 		puts "  Version:                           #{@elf_version.to_h}"
 	end
 
+	# ============================================================================
+	# Show Program Header info
+	# ============================================================================
 	def show_program_h_offset
 		puts "  Start of program headers:          #{@elf_program_h_offset.to_h} (bytes into file)"
 	end
 
+	# ============================================================================
+	# Show Section Header info
+	# ============================================================================
 	def show_section_h_offset
 		puts "  Start of section headers:          #{@elf_section_h_offset} (bytes into file)"
 	end
 
+	# ============================================================================
+	# Show ELF Flags info (ELF Flags is currently not used)
+	# ============================================================================
 	def show_elf_flags
 			puts "  Flags:                             #{@elf_flags.to_h}"
 	end
 
+	# ============================================================================
+	# Show size of ELF header.
+	# ============================================================================
 	def show_elf_h_size
 		puts "  Size of this header:               #{@elf_h_size} (bytes)"
 	end
 
+	# ============================================================================
+	# Show number of section headers.
+	# ============================================================================
 	def show_program_h_size
 		puts "  Size of program headers:           #{@elf_program_h_size} (bytes)"
 	end
 
+	# ============================================================================
+	# Show number of program headers.
+	# ============================================================================
 	def show_program_h_num
 		puts "  Number of program headers:         #{@elf_program_h_num}"
 	end
 
+	# ============================================================================
+	# Show size of section headers.
+	# ============================================================================
 	def show_section_h_size
 		puts "  Size of section headers:           #{@elf_section_h_size} (bytes)"
 	end
 
+	# ============================================================================
+	# Show number of section headers.
+	# ============================================================================
 	def show_section_h_num
 		puts "  Number of section headers:         #{@elf_section_h_num}"
 	end
 
+	# ============================================================================
+	# Show section name string table index.
+	# ============================================================================
 	def show_section_name_idx
 		 puts "  Section header string table index: #{@elf_section_name_idx}"
 	end
