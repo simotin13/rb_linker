@@ -211,12 +211,6 @@ class ELF
 		show_section_h_size
 		show_section_h_num
 		show_section_name_idx
-
-# TODO
-#		show_sections
-#		initialize_section_idx_map
-#		debug_section = get_section_header ".debug_info"
-#		show_section_header debug_section
 	end
 
 	# ============================================================================
@@ -467,6 +461,7 @@ class ELF
 		# =======================================================
 		# Get section info by section headers.
 		# =======================================================
+		@section_h_map = {}
 		idx = 0
 		while idx < @elf_section_h_num
 			pos = @elf_section_h_offset + (idx * @elf_section_h_size)
@@ -475,32 +470,15 @@ class ELF
 			name_pos = section_info[:name_idx]
 			len = names_section.length - name_pos
 			# get section name from '.shstrtab' section
-			section_info[:name] = names_section[name_pos, len].c_str
-			puts section_info
+			section_name = names_section[name_pos, len].c_str
+			section_info[:name] = section_name
+
+			# section_h_map
+			#  - key   : section name
+			#  - value : section_info
+			@section_h_map[section_name] = section_info
 			idx += 1
 		end
-
-=begin
-		@section_h_map = {}
-
-		# calc section names section pos.
-		pos = @elf_section_h_offset + (@elf_section_name_idx * @elf_section_h_size)
-		puts pos.to_h
-		puts @names_section.hex_dump
-		section_idx = 0
-		while section_idx < @elf_section_h_num
-			section_pos = @elf_section_h_offset + (section_idx * @elf_section_h_size)
-			section_data = @bin[section_pos, @elf_section_h_size]
-			sec_idx += 1
-
-			# .shstrtabにおけるセクション名のオフセット位置を取得
-			name_offset = section[0, ELF_SIZE_WORD].to_i
-			name = @names_section[name_offset, @names_sec_length].c_str
-
-			# セクションヘッダのインデックスを設定
-			@section_h_map[name] = section_idx
-		end
-=end
 	end
 
 	# ============================================================================
