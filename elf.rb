@@ -167,7 +167,11 @@ class ELF
 			@elf_section_h_num    = @bin[ELF64_OFFSET_SECTION_HEADER_NUM, ELF_SIZE_HALF_WORD].to_i(is_little)
 			@elf_section_name_idx = @bin[ELF64_OFFSET_SECTION_NAME_IDX, ELF_SIZE_HALF_WORD].to_i(is_little)
 		else
+			throw "Invalid ELF Class #{@elf_class}"
 		end
+
+		# create section name - section index map.
+		initialize_section_h_map
 	end
 
 	# ============================================================================
@@ -393,12 +397,100 @@ class ELF
 		 puts "  Section header string table index: #{@elf_section_name_idx}"
 	end
 
+	# ============================================================================
+	# get section info from section binary data.
+	# ============================================================================
+	def get_section_info section_header
+		section_info = {}
+		if @elf_class == :CLASS_ELF32
+			address_size = ELF_SIZE_ADDR_32
+			offset_size  = ELF_SIZE_OFFSET_32
+		else
+			address_size = ELF_SIZE_ADDR_64
+			offset_size  = ELF_SIZE_OFFSET_64
+		end
 
-	def initialize_section_idx_map
-		sec_idx = 0
-		while sec_idx < @e_shnum
-			sec_pos = @e_shoff + (sec_idx * @sh_size)
-			section = @bin[sec_pos, @sh_size]
+		# index of name string in .shstrtab
+		pos = 0
+		section_info[:name_idx] = section_header[pos, ELF_SIZE_WORD].to_i
+		pos += ELF_SIZE_WORD
+
+		# section type
+		section_info[:type] = section_header[pos, ELF_SIZE_WORD].to_i
+		pos += ELF_SIZE_WORD
+
+		# section flags
+		section_info[:flags] = section_header[pos, ELF_SIZE_WORD].to_i
+		pos += ELF_SIZE_WORD
+
+		# address when section loaded to memory.
+		section_info[:va_address] = section_header[pos, address_size].to_i
+		pos += address_size
+
+		# offset position of this secion in file.
+		section_info[:offset] = section_header[pos, offset_size].to_i
+		pos += offset_size
+
+		# section size
+		section_info[:size] = section_header[pos, ELF_SIZE_WORD].to_i
+		pos += ELF_SIZE_WORD
+
+		# Index of related section
+		section_info[:link] = section_header[pos, ELF_SIZE_WORD].to_i
+		pos += ELF_SIZE_WORD
+
+		# Depends on section type.
+		section_info[:info] = section_header[pos, ELF_SIZE_WORD].to_i
+		pos += ELF_SIZE_WORD
+
+		# Allignment size.
+		section_info[:addr_align] = section_header[pos, ELF_SIZE_WORD].to_i
+		pos += ELF_SIZE_WORD
+
+		# Section entry size (used when section has struct table)
+		section_info[:entry_size] =  section_header[pos, ELF_SIZE_WORD].to_i
+		section_info
+	end
+
+	def initialize_section_h_map
+
+		# =======================================================
+		# Get '.shstrtab' section data for take each section name.
+		# =======================================================
+		pos = @elf_section_h_offset + (@elf_section_name_idx * @elf_section_h_size)
+		names_section_header = @bin[pos, @elf_section_h_size]
+		section_info = get_section_info names_section_header
+		names_section_pos  = section_info[:offset]
+		names_section_size = section_info[:size]
+		names_section = @bin[names_section_pos, names_section_size]
+
+		# =======================================================
+		# Get section info by section headers.
+		# =======================================================
+		idx = 0
+		while idx < @elf_section_h_num
+			pos = @elf_section_h_offset + (idx * @elf_section_h_size)
+			section_header = @bin[pos, @elf_section_h_size]
+			section_info = get_section_info section_header
+			name_pos = section_info[:name_idx]
+			len = names_section.length - name_pos
+			# get section name from '.shstrtab' section
+			section_info[:name] = names_section[name_pos, len].c_str
+			puts section_info
+			idx += 1
+		end
+
+=begin
+		@section_h_map = {}
+
+		# calc section names section pos.
+		pos = @elf_section_h_offset + (@elf_section_name_idx * @elf_section_h_size)
+		puts pos.to_h
+		puts @names_section.hex_dump
+		section_idx = 0
+		while section_idx < @elf_section_h_num
+			section_pos = @elf_section_h_offset + (section_idx * @elf_section_h_size)
+			section_data = @bin[section_pos, @elf_section_h_size]
 			sec_idx += 1
 
 			# .shstrtabにおけるセクション名のオフセット位置を取得
@@ -406,8 +498,9 @@ class ELF
 			name = @names_section[name_offset, @names_sec_length].c_str
 
 			# セクションヘッダのインデックスを設定
-			@sh_idx_map[name] = sec_idx
+			@section_h_map[name] = section_idx
 		end
+=end
 	end
 
 	# ============================================================================
@@ -419,5 +512,9 @@ class ELF
 		return false if elf_identifer[2] != 'L'.ord
 		return false if elf_identifer[3] != 'F'.ord
 		true
+	end
+
+
+	def show_symtab_info
 	end
 end
