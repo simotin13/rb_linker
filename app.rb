@@ -6,7 +6,7 @@ if ARGV.length < 1
   exit 1
 end
 
-elf = ELF.new
-elf.load ARGV[0]
-
-elf.show_elf_header
+ARGV.each do |filepath|
+  elf = ELF.new filepath
+  elf.show_elf_header
+end
