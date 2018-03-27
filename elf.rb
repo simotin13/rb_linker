@@ -44,21 +44,21 @@ class ELF
 
 	# ============================================================================
 	# ELF64
-	# TODO Check Offset Pos
 	# ============================================================================
 	ELF64_OFFSET_IDENTIFER   					= 0
 	ELF64_OFFSET_TYPE        					= ELF64_OFFSET_IDENTIFER 						+ ELF_IDENT_SIZE
-	ELF64_OFFSET_MACHINE     					= ELF64_OFFSET_TYPE      						+ ELF_IDENT_SIZE
-	ELF64_OFFSET_VERSION     					= ELF64_OFFSET_MACHINE   						+ ELF_SIZE_HALF_WORD
-	ELF64_OFFSET_ENTRY       					= ELF64_OFFSET_VERSION   						+ ELF_SIZE_HALF_WORD
-	ELF64_OFFSET_PROGRAM_HEADER	 			= ELF64_OFFSET_ENTRY     						+ ELF_SIZE_ADDR_32
-	ELF64_OFFSET_SECTION_HEADER 			= ELF64_OFFSET_PROGRAM_HEADER       + ELF_SIZE_OFFSET_64
-	ELF64_OFFSET_FLAGS								= ELF64_OFFSET_SECTION_HEADER       + ELF_SIZE_OFFSET_64
-	ELF64_OFFSET_ELF_HEADER_SIZE			= ELF64_OFFSET_FLAGS                + ELF_SIZE_WORD
-	ELF64_OFFSET_PROGRAM_HEADER_ENTRY = ELF64_OFFSET_ELF_HEADER_SIZE      + ELF_SIZE_HALF_WORD
-	ELF64_OFFSET_PROGRAM_HEADER_NUM 	= ELF64_OFFSET_PROGRAM_HEADER_ENTRY + ELF_SIZE_HALF_WORD
-	ELF64_OFFSET_SECTION_HEADER_NUM 	= ELF64_OFFSET_PROGRAM_HEADER_NUM   + ELF_SIZE_HALF_WORD
-	ELF64_OFFSET_SECTION_NAME_IDX 	  = ELF64_OFFSET_SECTION_HEADER_NUM   + ELF_SIZE_HALF_WORD
+	ELF64_OFFSET_MACHINE     					= ELF64_OFFSET_TYPE 				    		+ ELF_SIZE_HALF_WORD
+	ELF64_OFFSET_VERSION     					= ELF64_OFFSET_MACHINE 				 			+ ELF_SIZE_HALF_WORD
+	ELF64_OFFSET_ENTRY       					= ELF64_OFFSET_VERSION 							+ ELF_SIZE_WORD
+	ELF64_OFFSET_PROGRAM_HEADER	 			= ELF64_OFFSET_ENTRY 		  					+ ELF_SIZE_ADDR_64
+	ELF64_OFFSET_SECTION_HEADER 			= ELF64_OFFSET_PROGRAM_HEADER 			+ ELF_SIZE_OFFSET_64
+	ELF64_OFFSET_FLAGS								= ELF64_OFFSET_SECTION_HEADER				+ ELF_SIZE_OFFSET_64
+	ELF64_OFFSET_ELF_HEADER_SIZE			= ELF64_OFFSET_FLAGS 								+ ELF_SIZE_WORD
+	ELF64_OFFSET_PROGRAM_HEADER_SIZE  = ELF64_OFFSET_ELF_HEADER_SIZE		 	+ ELF_SIZE_HALF_WORD
+	ELF64_OFFSET_PROGRAM_HEADER_NUM 	= ELF64_OFFSET_PROGRAM_HEADER_SIZE  + ELF_SIZE_HALF_WORD
+	ELF64_OFFSET_SECTION_HEADER_SIZE 	= ELF64_OFFSET_PROGRAM_HEADER_NUM 	+ ELF_SIZE_HALF_WORD
+	ELF64_OFFSET_SECTION_HEADER_NUM 	= ELF64_OFFSET_SECTION_HEADER_SIZE 	+ ELF_SIZE_HALF_WORD
+	ELF64_OFFSET_SECTION_NAME_IDX 	  = ELF64_OFFSET_SECTION_HEADER_NUM 	+ ELF_SIZE_HALF_WORD
 
 	# ============================================================================
 	# Legal values for e_type (object file type)
@@ -145,10 +145,21 @@ class ELF
 			@elf_program_h_num    = @bin[ELF32_OFFSET_PROGRAM_HEADER_NUM, ELF_SIZE_HALF_WORD].to_i(is_little)
 			@elf_section_h_size   = @bin[ELF32_OFFSET_SECTION_HEADER_SIZE, ELF_SIZE_HALF_WORD].to_i(is_little)
 			@elf_section_h_num    = @bin[ELF32_OFFSET_SECTION_HEADER_NUM, ELF_SIZE_HALF_WORD].to_i(is_little)
-			@elf_section_name_idx    = @bin[ELF32_OFFSET_SECTION_NAME_IDX, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_section_name_idx = @bin[ELF32_OFFSET_SECTION_NAME_IDX, ELF_SIZE_HALF_WORD].to_i(is_little)
 		when :CLASS_ELF64
-			# TODO ELF64
-			throw "TODO ELF64........"
+			@elf_type             = @bin[ELF64_OFFSET_TYPE, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_machine          = @bin[ELF64_OFFSET_MACHINE, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_version          = @bin[ELF64_OFFSET_VERSION, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_entry            = @bin[ELF64_OFFSET_ENTRY, ELF_SIZE_ADDR_64].to_i(is_little)
+			@elf_program_h_offset = @bin[ELF64_OFFSET_PROGRAM_HEADER, ELF_SIZE_OFFSET_64].to_i(is_little)
+			@elf_section_h_offset = @bin[ELF64_OFFSET_SECTION_HEADER, ELF_SIZE_OFFSET_64].to_i(is_little)
+			@elf_flags            = @bin[ELF64_OFFSET_FLAGS, ELF_SIZE_WORD].to_i(is_little)
+			@elf_h_size       		= @bin[ELF64_OFFSET_ELF_HEADER_SIZE, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_program_h_size   = @bin[ELF64_OFFSET_PROGRAM_HEADER_SIZE, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_program_h_num    = @bin[ELF64_OFFSET_PROGRAM_HEADER_NUM, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_section_h_size   = @bin[ELF64_OFFSET_SECTION_HEADER_SIZE, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_section_h_num    = @bin[ELF64_OFFSET_SECTION_HEADER_NUM, ELF_SIZE_HALF_WORD].to_i(is_little)
+			@elf_section_name_idx = @bin[ELF64_OFFSET_SECTION_NAME_IDX, ELF_SIZE_HALF_WORD].to_i(is_little)
 		else
 		end
 	end
@@ -215,15 +226,16 @@ class ELF
 	# Show ELF Class Info
 	# ============================================================================
 	def show_elf_class
-		print "  Class:                             "
+		class_str = ""
 		case @elf_class
 		when :CLASS_ELF32
-			puts "ELF32"
+			class_str = "ELF32"
 		when :CLASS_ELF64
-			puts "ELF32"
+			class_str = "ELF64"
 		else
-			puts "Invalid Class"
+			class_str = "Invalid Class"
 		end
+		puts "  Class:                             #{class_str}"
 	end
 
 	# ============================================================================
