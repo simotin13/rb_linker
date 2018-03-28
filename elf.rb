@@ -95,8 +95,16 @@ class ELF
 		case val
 		when 1
 			@elf_class = :CLASS_ELF32
+
+			# set Address and Offset size for ELF32
+			@address_size = ELF_SIZE_ADDR_32
+			@offset_size  = ELF_SIZE_OFFSET_32
 		when 2
 			@elf_class = :CLASS_ELF64
+
+			# set Address and Offset size for ELF64
+			@address_size = ELF_SIZE_ADDR_64
+			@offset_size  = ELF_SIZE_OFFSET_64
 		else
 			throw "Invalid ELF Class:#{val}"
 		end
@@ -396,13 +404,6 @@ class ELF
 	# ============================================================================
 	def get_section_info section_header
 		section_info = {}
-		if @elf_class == :CLASS_ELF32
-			address_size = ELF_SIZE_ADDR_32
-			offset_size  = ELF_SIZE_OFFSET_32
-		else
-			address_size = ELF_SIZE_ADDR_64
-			offset_size  = ELF_SIZE_OFFSET_64
-		end
 
 		# index of name string in .shstrtab
 		pos = 0
@@ -418,12 +419,12 @@ class ELF
 		pos += ELF_SIZE_WORD
 
 		# address when section loaded to memory.
-		section_info[:va_address] = section_header[pos, address_size].to_i
-		pos += address_size
+		section_info[:va_address] = section_header[pos, @address_size].to_i
+		pos += @address_size
 
 		# offset position of this secion in file.
-		section_info[:offset] = section_header[pos, offset_size].to_i
-		pos += offset_size
+		section_info[:offset] = section_header[pos, @offset_size].to_i
+		pos += @offset_size
 
 		# section size
 		section_info[:size] = section_header[pos, ELF_SIZE_WORD].to_i
@@ -483,10 +484,13 @@ class ELF
 
 		# DEBUG
 		show_sections_info(@section_h_map.values)
+
+		# DEBUG
+		show_symtab_section(@section_h_map[".symtab"])
 	end
 
 	# ============================================================================
-	# show section info
+	# show section info (readelf -S format)
 	# ============================================================================
 	def show_sections_info sections_info
 
@@ -504,7 +508,7 @@ class ELF
 			es_str = sprintf("%02X", section_info[:entry_size])
 
 			# ======================================================
-			# Section Attribute Flags # SHF bit pattern
+			# Section Attribute Flags(SHF bit pattern)
 			# ======================================================
 			flag_val = section_info[:flags]
 			flg_str = ""
@@ -557,6 +561,75 @@ class ELF
 			line += " #{al_str}"
 			puts line
 		end
+	end
+
+	# ============================================================================
+	# show .symtab secion info (readelf -s format)
+	# ============================================================================
+	def show_symtab_section symtab_section_info
+		sym_info = {}
+
+		offset = symtab_section_info[:offset]
+		size = symtab_section_info[:size]
+
+		# calc size of Elf_Sym structure
+		sym_h_size = ELF_SIZE_WORD + @address_size +
+								 ELF_SIZE_WORD + 1 + 1 + ELF_SIZE_HALF_WORD
+
+		# check symtab section size
+		throw "symtab section size is invalid" if size % sym_h_size != 0
+
+		symtab_section = @bin[offset, size]
+
+		offset = 0
+		left_size = size
+		loop do
+			break if left_size < 1
+			# =======================================================
+			# Get Elf_Sym info.
+			# =======================================================
+
+			# symbol name: symbol name string, offset position in .strtab section
+			st_name = symtab_section[offset, ELF_SIZE_WORD].to_i
+			offset += ELF_SIZE_WORD
+			sym_info[:st_name] = st_name
+
+			# value:
+			# in rel file(.o): offset position in section(.text/.bss/.data)
+			# in exe file(.out): virtual address when program loaded
+			st_value = symtab_section[offset, @address_size].to_i
+			offset += @address_size
+			sym_info[:st_value] = st_value
+
+			# size: symbol size
+			st_size = symtab_section[offset, ELF_SIZE_WORD].to_i
+			offset += ELF_SIZE_WORD
+			sym_info[:st_size] = st_size
+
+			# info: symbol scope(MSB 4bit) and type(LSB 4bit)
+			st_info = symtab_section[offset, 1].to_i
+			offset += 1
+			sym_info[:st_info] = st_info
+
+			# other: not used currently
+			st_other = symtab_section[offset, 1].to_i
+			offset += 1
+			sym_info[:st_other] = st_other
+
+			# section index: index of related section
+			# if symbol is function name, section index indicates .text section.
+			# Special value SHN_UNDEF, SHN_ABS, SHN_COMMON
+			st_shidx = symtab_section[offset, ELF_SIZE_HALF_WORD].to_i
+			offset += 1
+			sym_info[:st_shidx] = st_shidx
+
+			# DEBUG
+			puts sym_info
+
+			left_size -= sym_h_size
+		end
+
+		sym_info
 	end
 
 	# ============================================================================
