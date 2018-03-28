@@ -467,6 +467,7 @@ class ELF
 			pos = @elf_section_h_offset + (idx * @elf_section_h_size)
 			section_header = @bin[pos, @elf_section_h_size]
 			section_info = get_section_info section_header
+			section_info[:idx] = idx
 			name_pos = section_info[:name_idx]
 			len = names_section.length - name_pos
 			# get section name from '.shstrtab' section
@@ -478,6 +479,83 @@ class ELF
 			#  - value : section_info
 			@section_h_map[section_name] = section_info
 			idx += 1
+		end
+
+		# DEBUG
+		show_sections_info(@section_h_map.values)
+	end
+
+	# ============================================================================
+	# show section info
+	# ============================================================================
+	def show_sections_info sections_info
+
+		# show header line
+		puts "Section Headers:"
+		puts "  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al"
+
+		# show each section info
+		sections_info.each do |section_info|
+			idx_str = sprintf("%2d", section_info[:idx])
+			name = section_info[:name].ljust(17, ' ')
+			addr_str = sprintf("%08X", section_info[:va_address])
+			offset_str = sprintf("%06X", section_info[:offset])
+			size_str = sprintf("%06X", section_info[:size])
+			es_str = sprintf("%02X", section_info[:entry_size])
+
+			# ======================================================
+			# Section Attribute Flags # SHF bit pattern
+			# ======================================================
+			flag_val = section_info[:flags]
+			flg_str = ""
+			flg_str += "W" if (flag_val & 0x01) != 0	# WRITE
+			flg_str += "A" if (flag_val & 0x02) != 0	# ALLOC
+			flg_str += "X" if (flag_val & 0x04) != 0	# EXECINSTR
+			flg_str += "M" if (flag_val & 0x10) != 0	# MERGE
+			flg_str += "S" if (flag_val & 0x20) != 0	# STRINGS
+			flg_str += "I" if (flag_val & 0x40) != 0	# INFO_LINK
+			flg_str += "L" if (flag_val & 0x80) != 0	# LINK_ORDER
+			flg_str += "O" if (flag_val & 0x100) != 0	# OS_NONCONFORMING
+			flg_str += "G" if (flag_val & 0x200) != 0 # GROUP
+			flg_str += "T" if (flag_val & 0x400) != 0	# TLS
+			flg_str += "C" if (flag_val & 0x800) != 0	# COMPRESSED
+			flg_str = flg_str.ljust(3, ' ')
+
+			case section_info[:type]
+			when 0
+				type_str = "NULL"
+			when 1
+				type_str = "PROGBITS"
+			when 2
+				type_str = "SYMTAB"
+			when 3
+				type_str = "STRTAB"
+			when 8
+				type_str = "NOBITS"
+			when 9
+				type_str = "REL"
+			else
+				type_str = "*UNDEF*"
+			end
+			type_str = type_str.ljust(15, ' ')
+
+			# TODO Link
+			# link dec format.
+			lk_str = sprintf("%d", section_info[:link]).ljust(4, ' ')
+			info_str = sprintf("%d", section_info[:info]).ljust(2, ' ')
+			al_str = sprintf("%d", section_info[:addr_align])
+			line = "  [#{idx_str}]"
+			line += " #{name}"
+			line += " #{type_str}"
+			line += " #{addr_str}"
+			line += " #{offset_str}"
+			line += " #{size_str}"
+			line += " #{es_str}"
+			line += " #{flg_str}"
+			line += " #{lk_str}"
+			line += " #{info_str}"
+			line += " #{al_str}"
+			puts line
 		end
 	end
 
