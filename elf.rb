@@ -564,6 +564,23 @@ class ELF
 	end
 
 	# ============================================================================
+	# Get Strings from .strtab section
+	# ============================================================================
+	def get_string_table strtab_section_info
+		offset = strtab_section_info[:offset]
+		size = strtab_section_info[:size]
+		
+		strtab_section = @bin[offset, size]
+
+		left_len = 0
+		pos = 0
+		until left_len < size
+			strtab_section[pos]
+		end
+
+	end
+
+	# ============================================================================
 	# show .symtab secion info (readelf -s format)
 	# ============================================================================
 	def show_symtab_section symtab_section_info
@@ -620,7 +637,7 @@ class ELF
 			# if symbol is function name, section index indicates .text section.
 			# Special value SHN_UNDEF, SHN_ABS, SHN_COMMON
 			st_shidx = symtab_section[offset, ELF_SIZE_HALF_WORD].to_i
-			offset += 1
+			offset += ELF_SIZE_HALF_WORD
 			sym_info[:st_shidx] = st_shidx
 
 			# DEBUG
