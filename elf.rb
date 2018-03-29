@@ -486,6 +486,10 @@ class ELF
 		show_sections_info(@section_h_map.values)
 
 		# DEBUG
+		get_string_table(@section_h_map[".strtab"])
+		puts @string_map
+
+		# DEBUG
 		show_symtab_section(@section_h_map[".symtab"])
 	end
 
@@ -569,15 +573,18 @@ class ELF
 	def get_string_table strtab_section_info
 		offset = strtab_section_info[:offset]
 		size = strtab_section_info[:size]
-		
+
 		strtab_section = @bin[offset, size]
 
-		left_len = 0
+		left_len = size
 		pos = 0
-		until left_len < size
-			strtab_section[pos]
+		@string_map = {}
+		until left_len <= 0
+			str = strtab_section.c_str(pos)
+			@string_map[pos] = str
+			pos += (str.length + 1)
+			left_len -= (str.length + 1)
 		end
-
 	end
 
 	# ============================================================================
@@ -610,6 +617,7 @@ class ELF
 			st_name = symtab_section[offset, ELF_SIZE_WORD].to_i
 			offset += ELF_SIZE_WORD
 			sym_info[:st_name] = st_name
+			sym_info[:name_str] = @string_map[st_name]
 
 			# value:
 			# in rel file(.o): offset position in section(.text/.bss/.data)
