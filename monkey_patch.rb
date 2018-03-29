@@ -25,11 +25,13 @@ class Integer
 end
 
 class Array
-		def c_str
+
+		def c_str(offset = 0)
 			str = ""
-			self.each do |c|
-				break if c == 0
-				str << c.chr
+			while offset < self.length
+				break if self[offset] == 0
+				str << self[offset].chr
+				offset += 1
 			end
 			str
 		end
