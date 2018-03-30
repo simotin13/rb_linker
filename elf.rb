@@ -485,12 +485,13 @@ class ELF
 		# DEBUG
 		show_sections_info(@section_h_map.values)
 
-		# DEBUG
 		get_string_table(@section_h_map[".strtab"])
-		puts @string_map
+		puts "DEBUG:#{@string_map}"
+
+		symbol_table = get_symtab_section(@section_h_map[".symtab"])
 
 		# DEBUG
-		show_symtab_section(@section_h_map[".symtab"])
+		show_symbol_table(symbol_table)
 	end
 
 	# ============================================================================
@@ -588,10 +589,70 @@ class ELF
 	end
 
 	# ============================================================================
-	# show .symtab secion info (readelf -s format)
+	# show symtab secion(readelf -s format)
 	# ============================================================================
-	def show_symtab_section symtab_section_info
-		sym_info = {}
+	def show_symbol_table(symbol_table)
+		len = symbol_table.length 
+		puts "Symbol table '.symtab' contains #{len} entries:"
+		puts "   Num:    Value  Size Type    Bind   Vis      Ndx Name"
+		symbol_table.each.with_index(1) do |symbol_info, idx|
+			num_str = "#{idx.to_s.rjust(6, ' ')}:"
+			value_str = sprintf("%08x", symbol_info[:st_value])
+			size_str = symbol_info[:st_size].to_s.rjust(5, ' ')
+
+			# Type
+			type = (symbol_info[:st_info] & 0x0F)
+			pad_width = 7
+			case type
+			when 0
+				type_str = "NOTYPE".rjust(pad_width, ' ')
+			when 2
+				type_str = "FUNC".rjust(pad_width, ' ')
+			when 3
+				type_str = "SECTION".rjust(pad_width, ' ')
+			when 4
+				type_str = "FILE".rjust(pad_width, ' ')
+			else
+				type_str = "*UNDEFINED(#{type}*)".rjust(8, ' ')
+			end
+
+			# scope(Bind)
+			scope = (symbol_info[:st_info] & 0xF0) >> 4
+			case scope
+			when 0
+			  scope_str = "LOCAL"
+			when 1
+			  scope_str = "GLOBAL"
+			else
+			 	scope_str = "*UNDEFINED(#{scope}*)"
+			end
+			scope_str.rjust(6, ' ')
+
+			name_str = symbol_info[:name_str]
+
+			# TODO 
+			shidx = symbol_info[:st_shidx]
+			case shidx
+			when 0
+			 shidx_str = "UND"
+			when 0xFFF1
+			 shidx_str = "ABS"
+			else
+				shidx_str = shidx.to_s
+			end
+			shidx_str.rjust(8, ' ')
+
+			# TODO Vis
+			vis_str = "DEFAULT".rjust(8, ' ')
+			line = "#{num_str} #{value_str} #{size_str} #{type_str} #{scope_str} #{vis_str} #{shidx_str} #{name_str}"
+			puts line 
+		end
+	end
+
+	# ============================================================================
+	# get symbol_table from .symtab secion
+	# ============================================================================
+	def get_symtab_section symtab_section_info
 
 		offset = symtab_section_info[:offset]
 		size = symtab_section_info[:size]
@@ -607,54 +668,57 @@ class ELF
 
 		offset = 0
 		left_size = size
+		symbol_table = []
 		loop do
 			break if left_size < 1
+
 			# =======================================================
 			# Get Elf_Sym info.
 			# =======================================================
+			symtab_secion = {}
 
 			# symbol name: symbol name string, offset position in .strtab section
 			st_name = symtab_section[offset, ELF_SIZE_WORD].to_i
 			offset += ELF_SIZE_WORD
-			sym_info[:st_name] = st_name
-			sym_info[:name_str] = @string_map[st_name]
+			symtab_secion[:st_name] = st_name
+			symtab_secion[:name_str] = @string_map[st_name]
 
 			# value:
 			# in rel file(.o): offset position in section(.text/.bss/.data)
 			# in exe file(.out): virtual address when program loaded
 			st_value = symtab_section[offset, @address_size].to_i
 			offset += @address_size
-			sym_info[:st_value] = st_value
+			symtab_secion[:st_value] = st_value
 
 			# size: symbol size
 			st_size = symtab_section[offset, ELF_SIZE_WORD].to_i
 			offset += ELF_SIZE_WORD
-			sym_info[:st_size] = st_size
+			symtab_secion[:st_size] = st_size
 
 			# info: symbol scope(MSB 4bit) and type(LSB 4bit)
 			st_info = symtab_section[offset, 1].to_i
 			offset += 1
-			sym_info[:st_info] = st_info
+			symtab_secion[:st_info] = st_info
 
 			# other: not used currently
 			st_other = symtab_section[offset, 1].to_i
 			offset += 1
-			sym_info[:st_other] = st_other
+			symtab_secion[:st_other] = st_other
 
 			# section index: index of related section
 			# if symbol is function name, section index indicates .text section.
 			# Special value SHN_UNDEF, SHN_ABS, SHN_COMMON
 			st_shidx = symtab_section[offset, ELF_SIZE_HALF_WORD].to_i
 			offset += ELF_SIZE_HALF_WORD
-			sym_info[:st_shidx] = st_shidx
-
-			# DEBUG
-			puts sym_info
+			symtab_secion[:st_shidx] = st_shidx
 
 			left_size -= sym_h_size
+
+			# add to list
+			symbol_table << symtab_secion
 		end
 
-		sym_info
+		symbol_table
 	end
 
 	# ============================================================================
