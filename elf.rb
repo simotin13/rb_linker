@@ -485,13 +485,14 @@ class ELF
 		# DEBUG
 		show_sections_info(@section_h_map.values)
 
-		get_string_table(@section_h_map[".strtab"])
-		puts "DEBUG:#{@string_map}"
-
-		symbol_table = get_symtab_section(@section_h_map[".symtab"])
+		@string_map = get_string_table(@section_h_map[".strtab"])
+		symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 		# DEBUG
 		show_symbol_table(symbol_table)
+
+		#
+		get_rel_section(@section_h_map[".rel.text"])
 	end
 
 	# ============================================================================
@@ -506,7 +507,7 @@ class ELF
 		# show each section info
 		sections_info.each do |section_info|
 			idx_str = sprintf("%2d", section_info[:idx])
-			name = section_info[:name].ljust(17, ' ')
+			name = section_info[:name].ljust(17)
 			addr_str = sprintf("%08X", section_info[:va_address])
 			offset_str = sprintf("%06X", section_info[:offset])
 			size_str = sprintf("%06X", section_info[:size])
@@ -528,7 +529,7 @@ class ELF
 			flg_str += "G" if (flag_val & 0x200) != 0 # GROUP
 			flg_str += "T" if (flag_val & 0x400) != 0	# TLS
 			flg_str += "C" if (flag_val & 0x800) != 0	# COMPRESSED
-			flg_str = flg_str.ljust(3, ' ')
+			flg_str = flg_str.ljust(3)
 
 			case section_info[:type]
 			when 0
@@ -546,12 +547,12 @@ class ELF
 			else
 				type_str = "*UNDEF*"
 			end
-			type_str = type_str.ljust(15, ' ')
+			type_str = type_str.ljust(15)
 
 			# TODO Link
 			# link dec format.
-			lk_str = sprintf("%d", section_info[:link]).ljust(4, ' ')
-			info_str = sprintf("%d", section_info[:info]).ljust(2, ' ')
+			lk_str = sprintf("%d", section_info[:link]).ljust(4)
+			info_str = sprintf("%d", section_info[:info]).ljust(2)
 			al_str = sprintf("%d", section_info[:addr_align])
 			line = "  [#{idx_str}]"
 			line += " #{name}"
@@ -574,47 +575,47 @@ class ELF
 	def get_string_table strtab_section_info
 		offset = strtab_section_info[:offset]
 		size = strtab_section_info[:size]
-
 		strtab_section = @bin[offset, size]
 
 		left_len = size
 		pos = 0
-		@string_map = {}
+		string_map = {}
 		until left_len <= 0
 			str = strtab_section.c_str(pos)
-			@string_map[pos] = str
+			string_map[pos] = str
 			pos += (str.length + 1)
 			left_len -= (str.length + 1)
 		end
+		string_map
 	end
 
 	# ============================================================================
 	# show symtab secion(readelf -s format)
 	# ============================================================================
 	def show_symbol_table(symbol_table)
-		len = symbol_table.length 
+		len = symbol_table.length
 		puts "Symbol table '.symtab' contains #{len} entries:"
 		puts "   Num:    Value  Size Type    Bind   Vis      Ndx Name"
-		symbol_table.each.with_index(1) do |symbol_info, idx|
-			num_str = "#{idx.to_s.rjust(6, ' ')}:"
+		symbol_table.each_with_index do |symbol_info, idx|
+			num_str = "#{idx.to_s.rjust(6)}:"
 			value_str = sprintf("%08x", symbol_info[:st_value])
-			size_str = symbol_info[:st_size].to_s.rjust(5, ' ')
+			size_str = symbol_info[:st_size].to_s.rjust(5)
 
 			# Type
 			type = (symbol_info[:st_info] & 0x0F)
-			pad_width = 7
 			case type
 			when 0
-				type_str = "NOTYPE".rjust(pad_width, ' ')
+				type_str = "NOTYPE"
 			when 2
-				type_str = "FUNC".rjust(pad_width, ' ')
+				type_str = "FUNC"
 			when 3
-				type_str = "SECTION".rjust(pad_width, ' ')
+				type_str = "SECTION"
 			when 4
-				type_str = "FILE".rjust(pad_width, ' ')
+				type_str = "FILE"
 			else
-				type_str = "*UNDEFINED(#{type}*)".rjust(8, ' ')
+				type_str = "*UNDEFINED(#{type}*)"
 			end
+			type_str = type_str.ljust(7)
 
 			# scope(Bind)
 			scope = (symbol_info[:st_info] & 0xF0) >> 4
@@ -626,34 +627,41 @@ class ELF
 			else
 			 	scope_str = "*UNDEFINED(#{scope}*)"
 			end
-			scope_str.rjust(6, ' ')
+			scope_str = scope_str.ljust(6)
 
 			name_str = symbol_info[:name_str]
 
-			# TODO 
+			# TODO
 			shidx = symbol_info[:st_shidx]
 			case shidx
 			when 0
 			 shidx_str = "UND"
-			when 0xFFF1
+		 	when 0xFF1F						# SHN_HIPROC
+				shidx_str = "HIPROC"
+			when 0xFF20						# SHN_LOOS
+				shidx_str = "LOOS"
+		 	when 0xFF3F						# SHN_HIOS
+			 shidx_str = "HIOS"
+		 	when 0xFFF1						# SHN_ABS
 			 shidx_str = "ABS"
+		 	when 0xFFF2						# SHN_COMMON
+			 shidx_str = "CMN"
 			else
 				shidx_str = shidx.to_s
 			end
-			shidx_str.rjust(8, ' ')
+			shidx_str = shidx_str.rjust(3)
 
 			# TODO Vis
-			vis_str = "DEFAULT".rjust(8, ' ')
+			vis_str = "DEFAULT".ljust(8)
 			line = "#{num_str} #{value_str} #{size_str} #{type_str} #{scope_str} #{vis_str} #{shidx_str} #{name_str}"
-			puts line 
+			puts line
 		end
 	end
 
 	# ============================================================================
 	# get symbol_table from .symtab secion
 	# ============================================================================
-	def get_symtab_section symtab_section_info
-
+	def get_symtab_section symtab_section_info, string_map
 		offset = symtab_section_info[:offset]
 		size = symtab_section_info[:size]
 
@@ -681,7 +689,7 @@ class ELF
 			st_name = symtab_section[offset, ELF_SIZE_WORD].to_i
 			offset += ELF_SIZE_WORD
 			symtab_secion[:st_name] = st_name
-			symtab_secion[:name_str] = @string_map[st_name]
+			symtab_secion[:name_str] = string_map[st_name]
 
 			# value:
 			# in rel file(.o): offset position in section(.text/.bss/.data)
@@ -717,8 +725,24 @@ class ELF
 			# add to list
 			symbol_table << symtab_secion
 		end
-
 		symbol_table
+	end
+
+	# ============================================================================
+	# get .rel.text section
+	# ============================================================================
+	def get_rel_section rel_section_info
+		offset = rel_section_info[:offset]
+		size = rel_section_info[:size]
+		rel_section = @bin[offset, size]
+
+		offset = 0
+		r_offset = rel_section[offset, @address_size].to_i
+		offset += @address_size
+		r_info = rel_section[offset, ELF_SIZE_WORD].to_i
+		r_symbol = (r_info & 0xFFFFFF00) >> 24
+		r_type = r_info & 0xFF
+		puts "r_offset:#{r_offset}, r_symbol:#{r_symbol}, r_type:#{r_type}"
 	end
 
 	# ============================================================================
@@ -730,9 +754,5 @@ class ELF
 		return false if elf_identifer[2] != 'L'.ord
 		return false if elf_identifer[3] != 'F'.ord
 		true
-	end
-
-
-	def show_symtab_info
 	end
 end
