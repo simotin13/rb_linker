@@ -15,3 +15,9 @@ int call_local() {
 	ret = func_local();
 	return ret;
 }
+
+void set_ext_number(void)
+{
+    // set extern variable
+    ext_number = 0x1234;
+}
