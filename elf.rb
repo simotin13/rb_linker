@@ -501,11 +501,28 @@ class ELF
 		@rel_sections = {}
 		if @section_h_map.has_key? ".rel.text"
 			@rel_sections[".rel.text"] = get_rel_section(@section_h_map[".rel.text"], @symbol_table)
+			show_rel_section(".rel.text", @rel_sections[".rel.text"])
 		end
 		if @section_h_map.has_key? ".rel.data"
 			@rel_sections[".rel.data"] = get_rel_section(@section_h_map[".rel.data"], @symbol_table)
+			show_rel_section(".rel.data", @rel_sections[".rel.data"])
 		end
-		puts @rel_sections
+
+		# DEBUG
+	end
+
+	def show_rel_section section_name, rel_section
+		puts "Relocation section #{section_name} at offset 0x268 contains #{rel_section.length} entries:"
+		puts " Offset     Info    Type            Sym.Value  Sym. Name"
+		rel_section.each do |rel_info|
+			offset_str = sprintf("%08x", rel_info[:offset]).ljust(9)
+			info_str = sprintf("%08x", rel_info[:info])
+			type_str = rel_info[:type]
+			type_str = type_str.to_s.ljust(16)
+			val_str = rel_info[:symbol].to_s.ljust(15)
+			name_str = rel_info[:name]
+			puts "#{offset_str} #{info_str} #{type_str} #{val_str} #{name_str}"
+		end
 	end
 
 	def get_strtab_string offset
@@ -734,6 +751,7 @@ class ELF
 
 		offset = 0
 		left_len = size
+		rel_symbol_list = []
 		while 0 < left_len
 			h = {}
 			r_offset = rel_section[offset, @address_size].to_i
@@ -751,8 +769,10 @@ class ELF
 			h[:info] = r_info
 			h[:symbol] = r_symbol
 			h[:type] = r_type
-			h
+			h[:name] = symbol_table[r_symbol][:name_str]
+			rel_symbol_list << h
 		end
+		rel_symbol_list
 	end
 
 	# ============================================================================
