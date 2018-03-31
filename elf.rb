@@ -485,14 +485,31 @@ class ELF
 		# DEBUG
 		show_sections_info(@section_h_map.values)
 
-		@string_map = get_string_table(@section_h_map[".strtab"])
-		symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
+		# get .strtab section
+		# until set @strtab_section, can't use get_strtab_string.
+		offset = @section_h_map[".strtab"][:offset]
+		size = @section_h_map[".strtab"][:size]
+		@strtab_section = @bin[offset, size]
+
+		@symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 		# DEBUG
-		show_symbol_table(symbol_table)
+		show_symbol_table(@symbol_table)
 
-		#
-		get_rel_section(@section_h_map[".rel.text"])
+		# get relocation section info(.rel.text, .rel.data)
+		# TODO .rela
+		@rel_sections = {}
+		if @section_h_map.has_key? ".rel.text"
+			@rel_sections[".rel.text"] = get_rel_section(@section_h_map[".rel.text"], @symbol_table)
+		end
+		if @section_h_map.has_key? ".rel.data"
+			@rel_sections[".rel.data"] = get_rel_section(@section_h_map[".rel.data"], @symbol_table)
+		end
+		puts @rel_sections
+	end
+
+	def get_strtab_string offset
+		@strtab_section.c_str(offset)
 	end
 
 	# ============================================================================
@@ -565,28 +582,7 @@ class ELF
 			line += " #{lk_str}"
 			line += " #{info_str}"
 			line += " #{al_str}"
-			puts line
 		end
-	end
-
-	# ============================================================================
-	# Get Strings from .strtab section
-	# ============================================================================
-	def get_string_table strtab_section_info
-		offset = strtab_section_info[:offset]
-		size = strtab_section_info[:size]
-		strtab_section = @bin[offset, size]
-
-		left_len = size
-		pos = 0
-		string_map = {}
-		until left_len <= 0
-			str = strtab_section.c_str(pos)
-			string_map[pos] = str
-			pos += (str.length + 1)
-			left_len -= (str.length + 1)
-		end
-		string_map
 	end
 
 	# ============================================================================
@@ -686,10 +682,10 @@ class ELF
 			symtab_secion = {}
 
 			# symbol name: symbol name string, offset position in .strtab section
-			st_name = symtab_section[offset, ELF_SIZE_WORD].to_i
+			name_offset = symtab_section[offset, ELF_SIZE_WORD].to_i
 			offset += ELF_SIZE_WORD
-			symtab_secion[:st_name] = st_name
-			symtab_secion[:name_str] = string_map[st_name]
+			symtab_secion[:name_offset] = name_offset
+			symtab_secion[:name_str] = get_strtab_string(name_offset)
 
 			# value:
 			# in rel file(.o): offset position in section(.text/.bss/.data)
@@ -731,18 +727,32 @@ class ELF
 	# ============================================================================
 	# get .rel.text section
 	# ============================================================================
-	def get_rel_section rel_section_info
+	def get_rel_section rel_section_info, symbol_table
 		offset = rel_section_info[:offset]
 		size = rel_section_info[:size]
 		rel_section = @bin[offset, size]
 
 		offset = 0
-		r_offset = rel_section[offset, @address_size].to_i
-		offset += @address_size
-		r_info = rel_section[offset, ELF_SIZE_WORD].to_i
-		r_symbol = (r_info & 0xFFFFFF00) >> 24
-		r_type = r_info & 0xFF
-		puts "r_offset:#{r_offset}, r_symbol:#{r_symbol}, r_type:#{r_type}"
+		left_len = size
+		while 0 < left_len
+			h = {}
+			r_offset = rel_section[offset, @address_size].to_i
+			offset += @address_size
+			left_len -= @address_size
+
+			h[:offset] = r_offset
+
+			r_info = rel_section[offset, ELF_SIZE_WORD].to_i
+			offset += ELF_SIZE_WORD
+			left_len -= ELF_SIZE_WORD
+
+			r_symbol = (r_info & 0xFFFFFF00) >> 8
+			r_type = r_info & 0xFF
+			h[:info] = r_info
+			h[:symbol] = r_symbol
+			h[:type] = r_type
+			h
+		end
 	end
 
 	# ============================================================================
