@@ -2,7 +2,7 @@ require './monkey_patch'
 require './machine_arch_list'
 
 class ELF
-	attr_reader :section_h_map
+	attr_reader :section_h_map, :ident, :elf_class, :elf_endian, :elf_version, :os_abi
 
 	# ============================================================================
 	# ELF Identifer
@@ -198,6 +198,19 @@ class ELF
 	end
 
 	# ============================================================================
+	# Get section daat by section name
+	# ============================================================================
+	def get_section_data section_name
+		return nil unless @section_h_map.has_key?(section_name)
+
+		offset = @section_h_map[section_name][:offset]
+		size = @section_h_map[section_name][:size]
+		section_data = @bin[offset, size]
+	end
+
+private
+
+	# ============================================================================
 	# Show ELF Header info like `readelf -h` format.
 	# ============================================================================
 	def show_elf_header
@@ -221,12 +234,6 @@ class ELF
 		show_section_h_size
 		show_section_h_num
 		show_section_name_idx
-	end
-
-	# ============================================================================
-	# Show Section Header Info
-	# ============================================================================
-	def show_section_header section_header
 	end
 
 	# ============================================================================
@@ -621,6 +628,8 @@ class ELF
 			case type
 			when 0
 				type_str = "NOTYPE"
+			when 1
+				type_str = "OBJECT"
 			when 2
 				type_str = "FUNC"
 			when 3
