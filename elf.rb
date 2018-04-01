@@ -2,6 +2,8 @@ require './monkey_patch'
 require './machine_arch_list'
 
 class ELF
+	attr_reader :section_h_map
+
 	# ============================================================================
 	# ELF Identifer
 	# ============================================================================
