@@ -1,19 +1,20 @@
-#!/usr/local/bin/ruby
-
-require "./elf"
-require "./elf_linker"
+#!/usr/bin/ruby
+$LOAD_PATH.push("./ELF")
+require "elf"
+require "reader"
+require "linker"
 
 if ARGV.length < 1
   puts "input object file."
   exit 1
 end
 
-linker = ElfLinker.new
+linker = ELF::Linker.new
 elf_ojects = []
 
 elf_class = nil
 ARGV.each do |filepath|
-  elf_object = ELF.new filepath
+  elf_object = ELF::Reader.new filepath
   if elf_class.nil?
     elf_class = elf_object.elf_class
   else
