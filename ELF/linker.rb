@@ -14,13 +14,21 @@ module ELF
 	    elf_first = elf_objects.first
 	    elf_objects = elf_objects
 	    link_f = open(filepath, "wb")
+			section_size = 0
+
+			# .text section
+			text_section = []
 	    elf_objects.each do |elf_object|
-	      text = elf_object.get_section_data(".text")
-	      link_f.write(text.pack("C*"))
+	      text_section.concat(elf_object.get_section_data(".text"))
 	    end
 
-
+			# ELF header
 	    out_elf_header(link_f, elf_first, elf_objects)
+
+			# text section
+			link_f.write(text_section.pack("C*"))
+
+			# Section Header
 
 	  end
 
