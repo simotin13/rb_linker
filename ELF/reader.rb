@@ -29,14 +29,14 @@ module ELF
 			# Check ELF class
 			val = elf_ident[ELF_IDENT_OFFSET_CLASS].ord
 			case val
-			when 1
-				@elf_class = :CLASS_ELF32
+			when ELF_CLASS_ELF32
+				@elf_class = ELF_CLASS_ELF32
 
 				# set Address and Offset size for ELF32
 				@address_size = ELF_SIZE_ADDR_32
 				@offset_size  = ELF_SIZE_OFFSET_32
-			when 2
-				@elf_class = :CLASS_ELF64
+			when ELF_CLASS_ELF64
+				@elf_class = ELF_CLASS_ELF64
 
 				# set Address and Offset size for ELF64
 				@address_size = ELF_SIZE_ADDR_64
@@ -48,10 +48,8 @@ module ELF
 			# Check Endian
 			val = elf_ident[ELF_IDENT_OFFSET_ENDIAN].ord
 			case val
-			when 1
-				@elf_endian = :ELF_LITTLE_ENDIAN
-			when 2
-				@elf_endian = :ELF_BIG_ENDIAN
+			when ELF_LITTLE_ENDIAN, ELF_BIG_ENDIAN
+				@elf_endian = val
 			else
 				throw "Invalid ELF Endian:#{val}"
 			end
@@ -66,10 +64,8 @@ module ELF
 			# Check OS ABI
 			val = elf_ident[ELF_IDENT_OFFSET_OS_ABI].ord
 			case val
-			when 0
-				@os_abi = :OS_ABI_UNIX
-			when 3
-				@os_abi = :OS_ABI_LINUX
+			when OS_ABI_UNIX, OS_ABI_LINUX
+				@os_abi = val
 			else
 				throw "Unsuppoted OS ABI Format:#{val}"
 			end
@@ -80,9 +76,9 @@ module ELF
 			@bin = bin
 			@ident = elf_ident
 
-			is_little = @elf_endian == :ELF_LITTLE_ENDIAN
+			is_little = @elf_endian == ELF_LITTLE_ENDIAN
 			case @elf_class
-			when :CLASS_ELF32
+			when ELF_CLASS_ELF32
 				@elf_type             = @bin[ELF32_OFFSET_TYPE, ELF_SIZE_HALF_WORD].to_i(is_little)
 				@elf_machine          = @bin[ELF32_OFFSET_MACHINE, ELF_SIZE_HALF_WORD].to_i(is_little)
 				@elf_version          = @bin[ELF32_OFFSET_VERSION, ELF_SIZE_HALF_WORD].to_i(is_little)
@@ -96,7 +92,7 @@ module ELF
 				@elf_section_h_size   = @bin[ELF32_OFFSET_SECTION_HEADER_SIZE, ELF_SIZE_HALF_WORD].to_i(is_little)
 				@elf_section_h_num    = @bin[ELF32_OFFSET_SECTION_HEADER_NUM, ELF_SIZE_HALF_WORD].to_i(is_little)
 				@elf_section_name_idx = @bin[ELF32_OFFSET_SECTION_NAME_IDX, ELF_SIZE_HALF_WORD].to_i(is_little)
-			when :CLASS_ELF64
+			when ELF_CLASS_ELF64
 				@elf_type             = @bin[ELF64_OFFSET_TYPE, ELF_SIZE_HALF_WORD].to_i(is_little)
 				@elf_machine          = @bin[ELF64_OFFSET_MACHINE, ELF_SIZE_HALF_WORD].to_i(is_little)
 				@elf_version          = @bin[ELF64_OFFSET_VERSION, ELF_SIZE_HALF_WORD].to_i(is_little)
@@ -183,9 +179,9 @@ module ELF
 		def show_elf_class
 			class_str = ""
 			case @elf_class
-			when :CLASS_ELF32
+			when ELF_CLASS_ELF32
 				class_str = "ELF32"
-			when :CLASS_ELF64
+			when ELF_CLASS_ELF32
 				class_str = "ELF64"
 			else
 				class_str = "Invalid Class"
@@ -199,9 +195,9 @@ module ELF
 		def show_endian
 			endian_str = ""
 			case @elf_endian
-			when :ELF_LITTLE_ENDIAN
+			when ELF_LITTLE_ENDIAN
 				endian_str = "2's complement, little endian"
-			when :ELF_BIG_ENDIAN
+			when ELF_BIG_ENDIAN
 				endian_str = "2's complement, big endian"
 			else
 				endian_str = "Invalid Endian"
