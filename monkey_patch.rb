@@ -1,4 +1,136 @@
 class Integer
+	def to_bin8(is_little=true)
+		ary = []
+		if self < 0xFF
+			ary.push(0x00)
+			ary.push(self)
+		else
+			throw "Unexpected Integer value #{self}"
+		end
+		ary.reverse! if is_little
+		ary.pack("C*")
+	end
+
+	def to_bin16(is_little=true)
+		ary = []
+		if self < 0xFF
+			ary.push(0x00)
+			ary.push(self)
+		elsif self < 0xFFFF
+			tmp = (self & 0xFF00) >> 8
+			ary.push(tmp)
+			tmp = (self & 0x00FF)
+			ary.push(tmp)
+		else
+			throw "Unexpected Integer value #{self}"
+		end
+		ary.reverse! if is_little
+		ary.pack("C*")
+	end
+
+	def to_bin32(is_little = true)
+		ary = []
+		if self < 0xFF
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(self)
+		elsif self < 0xFFFF
+			ary.push(0x00)
+			ary.push(0x00)
+			tmp = (self & 0xFF00) >> 8
+			ary.push(tmp)
+			tmp = (self & 0x00FF)
+			ary.push(tmp)
+		elsif self < 0xFFFFFFFF
+			tmp  = (self & 0xFF000000) >> 24
+			ary.push(tmp)
+
+			tmp  = (self & 0x00FF0000) >> 16
+			ary.push(tmp)
+
+			tmp  = (self & 0x0000FF00) >> 8
+			ary.push(tmp)
+
+			tmp  = (self & 0x000000FF)
+			ary.push(tmp)
+		else
+			throw "Unexpected Integer value #{self}"
+		end
+		ary.reverse! if is_little
+		ary.pack("C*")
+	end
+
+	def to_bin64(is_little=true)
+		ary = []
+		if self < 0xFF
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(self)
+		elsif self < 0xFFFF
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+
+			tmp = (self & 0xFF00) >> 8
+			ary.push(tmp)
+			tmp = (self & 0x00FF)
+			ary.push(tmp)
+		elsif self < 0xFFFFFFFF
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			ary.push(0x00)
+			tmp  = (self & 0xFF000000) >> 24
+			ary.push(tmp)
+
+			tmp  = (self & 0x00FF0000) >> 16
+			ary.push(tmp)
+
+			tmp  = (self & 0x0000FF00) >> 8
+			ary.push(tmp)
+
+			tmp  = (self & 0x000000FF)
+			ary.push(tmp)
+		elsif self < 0xFFFFFFFFFFFFFFFF
+			tmp  = (self & 0xFF00000000000000) >> 56
+			ary.push(tmp)
+
+			tmp  = (self & 0x00FF000000000000) >> 48
+			ary.push(tmp)
+
+			tmp  = (self & 0x0000FF0000000000) >> 40
+			ary.push(tmp)
+
+			tmp  = (self & 0x000000FF00000000) >> 32
+			ary.push(tmp)
+
+			tmp  = (self & 0x00000000FF000000) >> 24
+			ary.push(tmp)
+
+			tmp  = (self & 0x0000000000FF0000) >> 16
+			ary.push(tmp)
+
+			tmp  = (self & 0x000000000000FF00) >> 8
+			ary.push(tmp)
+
+			tmp  = (self & 0x00000000000000FF)
+			ary.push(tmp)
+		else
+			throw "Unexpected Integer value #{self}"
+		end
+		ary.reverse! if is_little
+		ary.pack("C*")
+	end
+
   def to_h(prefix=true, capital=true)
 		prefix_str = ""
 		prefix_str = "0x" if prefix
