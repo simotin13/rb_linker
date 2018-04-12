@@ -112,6 +112,8 @@ module ELF
 
 			# create section name - section index map.
 			initialize_section_h_map
+
+			get_program_header
 		end
 
 		# ============================================================================
@@ -714,6 +716,56 @@ module ELF
 				rel_symbol_list << h
 			end
 			rel_symbol_list
+		end
+
+		def get_program_header
+			puts @elf_program_h_offset
+			puts @elf_program_h_num
+			puts @elf_program_h_size
+			total_h_size = @elf_program_h_num * @elf_program_h_size
+			program_h_table = @bin[@elf_program_h_offset, total_h_size]
+
+			program_h_info_list = []
+			offset = 0
+			while offset < total_h_size
+				program_h_info = {}
+				# segment type
+				p_type = program_h_table[offset, ELF_SIZE_WORD]
+				offset += ELF_SIZE_WORD
+				program_h_info[:p_type] = p_type
+
+				# Offset of contents
+				p_offset = program_h_table[offset, @offset_size]
+				offset += @offset_size
+				program_h_info[:p_offset] = p_offset
+
+				# virtual address
+				p_vaaddr = program_h_table[offset, @address_size]
+				offset += @address_size
+				program_h_info[:p_vaaddr] = p_vaaddr
+
+				# physical address
+				p_paaddr = program_h_table[offset, @address_size]
+				offset += @address_size
+				program_h_info[:p_paaddr] = p_paaddr
+
+				# segment size in file.
+				p_filesz = program_h_table[offset, ELF_SIZE_WORD]
+				offset += ELF_SIZE_WORD
+				program_h_info[:p_filesz] = p_filesz
+
+				# segment size in memory.
+				p_memsz = program_h_table[offset, ELF_SIZE_WORD]
+				offset += ELF_SIZE_WORD
+				program_h_info[:p_memsz] = p_memsz
+
+				# align size
+				p_align = program_h_table[offset, ELF_SIZE_WORD]
+				offset += ELF_SIZE_WORD
+				program_h_info[:p_align] = p_align
+				program_h_info_list << program_h_info
+			end
+			puts program_h_info_list
 		end
 
 		# ============================================================================
