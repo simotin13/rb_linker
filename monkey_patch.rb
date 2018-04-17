@@ -1,5 +1,20 @@
 class Integer
-	def to_bin8(is_little=true)
+  def to_bin(addr_size, is_little)
+  	case addr_size
+  	when 1
+  		to_bin8
+  	when 2
+  		to_bin16(is_little)
+  	when 4
+  		to_bin32(is_little)
+  	when 8
+  		to_bin64(is_little)
+  	else
+  		raise "unexpected addr size"
+  	end
+  end
+
+	def to_bin8
 		ary = []
 		if self < 0xFF
 			ary.push(0x00)
@@ -7,7 +22,6 @@ class Integer
 		else
 			throw "Unexpected Integer value #{self}"
 		end
-		ary.reverse! if is_little
 		ary.pack("C*")
 	end
 
