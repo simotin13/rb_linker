@@ -14,16 +14,15 @@ elf_ojects = []
 
 elf_class = nil
 ARGV.each do |filepath|
-  elf_object = ELF::Reader.new filepath
+  elf_object = ELF::Reader.new
+  elf_object.read(filepath)
   if elf_class.nil?
     elf_class = elf_object.elf_class
   else
-    # different class found
     throw "Different Elf Class found!" if elf_class != elf_object.elf_class
   end
   elf_object.section_h_map.delete_if { |key, val| val[:size] == 0 }
   elf_ojects << elf_object
-
 end
 
 # Link Object files.

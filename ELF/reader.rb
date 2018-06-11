@@ -5,19 +5,12 @@ module ELF
 	class Reader
 		attr_reader :section_h_map, :ident, :elf_class, :elf_endian, :elf_version, :os_abi
 
-		# ============================================================================
-		# Construster
-		# - Load Object File to memory.
-		# ============================================================================
-		def initialize filepath
-			load(filepath)
-		end
 
 		# ============================================================================
 		# Load Object File
 		# - Check if valid ELF and set elf infos.
 		# ============================================================================
-		def load filepath
+		def read filepath
 			bin = File.binread(filepath).unpack("C*")
 			elf_ident = bin[0, ELF_IDENT_SIZE]
 
@@ -424,7 +417,7 @@ module ELF
 			end
 
 			# DEBUG
-			show_sections_info(@section_h_map.values)
+			#show_sections_info(@section_h_map.values)
 
 			# get .strtab section
 			# until set @strtab_section, can't use get_strtab_string.
@@ -435,7 +428,7 @@ module ELF
 			@symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 			# DEBUG
-			show_symbol_table(@symbol_table)
+			# show_symbol_table(@symbol_table)
 
 			# get relocation section info(.rel.text, .rel.data)
 			# TODO .rela
@@ -719,9 +712,9 @@ module ELF
 		end
 
 		def get_program_header
-			puts @elf_program_h_offset
-			puts @elf_program_h_num
-			puts @elf_program_h_size
+			puts "elf_program_h_offset: #{@elf_program_h_offset}"
+			puts "elf_program_h_num   : #{@elf_program_h_num}"
+			puts "elf_program_h_size  : #{@elf_program_h_size}"
 			total_h_size = @elf_program_h_num * @elf_program_h_size
 			program_h_table = @bin[@elf_program_h_offset, total_h_size]
 
@@ -765,7 +758,6 @@ module ELF
 				program_h_info[:p_align] = p_align
 				program_h_info_list << program_h_info
 			end
-			puts program_h_info_list
 		end
 
 		# ============================================================================

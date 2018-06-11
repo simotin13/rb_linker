@@ -19,6 +19,8 @@ module ELF
 			# .text section
 			text_section = []
 	    elf_objects.each do |elf_object|
+	    	text_sect = elf_object.get_section_data(".text")
+	    	next if text_sect.nil?
 	      text_section.concat(elf_object.get_section_data(".text"))
 	    end
 
