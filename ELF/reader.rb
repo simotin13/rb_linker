@@ -417,7 +417,7 @@ module ELF
 			end
 
 			# DEBUG
-			#show_sections_info(@section_h_map.values)
+			show_sections_info(@section_h_map.values)
 
 			# get .strtab section
 			# until set @strtab_section, can't use get_strtab_string.
@@ -428,7 +428,7 @@ module ELF
 			@symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 			# DEBUG
-			# show_symbol_table(@symbol_table)
+			#show_symbol_table(@symbol_table)
 
 			# get relocation section info(.rel.text, .rel.data)
 			# TODO .rela
@@ -533,6 +533,7 @@ module ELF
 				line += " #{lk_str}"
 				line += " #{info_str}"
 				line += " #{al_str}"
+				puts line
 			end
 		end
 
