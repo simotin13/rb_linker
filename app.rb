@@ -2,14 +2,13 @@
 $LOAD_PATH.push("./ELF")
 require "elf"
 require "reader"
-require "linker"
+require "rx_linker"
 
 if ARGV.length < 1
   puts "input object file."
   exit 1
 end
 
-linker = ELF::Linker.new
 elf_ojects = []
 
 elf_class = nil
@@ -26,4 +25,5 @@ ARGV.each do |filepath|
 end
 
 # Link Object files.
-linker.link "linked.o", elf_ojects
+linker = ELF::RXLinker.new
+linker.link "rx_linked.o", elf_ojects
