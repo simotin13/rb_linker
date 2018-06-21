@@ -3,30 +3,30 @@ require 'linker'
 module ELF
 
 	RX_SECTIONS = [
-		"P",									# ƒvƒƒOƒ‰ƒ€—Ìˆæ				1byte
-		"C",									# const ƒf[ƒ^—Ìˆæ			4byte
-		"C_2",								# const ƒf[ƒ^—Ìˆæ			2byte
-		"C_1",								# const ƒf[ƒ^—Ìˆæ			2byte
-		"D",									# ‰Šú’l‚ ‚èƒf[ƒ^			4byte
-		"D_2",								# ‰Šú’l‚ ‚èƒf[ƒ^			2byte
-		"D_1",								# ‰Šú’l‚ ‚èƒf[ƒ^			1byte
-		"SU",									# ƒ†[ƒU[ƒXƒ^ƒbƒN—Ìˆæ	4byte
-		"SI",									# Š„‚èž‚ÝƒXƒ^ƒbƒN			4byte
-		"C$VECT",							# ‰Â•ÏƒxƒNƒ^ƒe[ƒuƒ‹(Š„‚èž‚Ýƒnƒ“ƒhƒ‰)
-		"C$DSEC",							# ‰Šú’l‚ ‚èƒf[ƒ^ƒZƒNƒVƒ‡ƒ“ƒe[ƒuƒ‹
-		"C$BSEC",							# ‰Šú’l‚È‚µƒf[ƒ^ƒZƒNƒVƒ‡ƒ“—pƒe[ƒuƒ‹
-		"FIXEDVECT",					# ŒÅ’èƒxƒNƒ^ƒe[ƒuƒ‹(Š„‚èž‚Ýƒnƒ“ƒhƒ‰)
-		"PResetPRG",					# ƒŠƒZƒbƒgƒxƒNƒ^
-		".symtab",						# ƒVƒ“ƒ{ƒ‹ƒe[ƒuƒ‹
-		".debug_info",				# ƒfƒoƒbƒOî•ñ
+		"P",									# ãƒ—ãƒ­ã‚°ãƒ©ãƒ é ˜åŸŸ				1byte
+		"C",									# const ãƒ‡ãƒ¼ã‚¿é ˜åŸŸ			4byte
+		"C_2",								# const ãƒ‡ãƒ¼ã‚¿é ˜åŸŸ			2byte
+		"C_1",								# const ãƒ‡ãƒ¼ã‚¿é ˜åŸŸ			2byte
+		"D",									# åˆæœŸå€¤ã‚ã‚Šãƒ‡ãƒ¼ã‚¿			4byte
+		"D_2",								# åˆæœŸå€¤ã‚ã‚Šãƒ‡ãƒ¼ã‚¿			2byte
+		"D_1",								# åˆæœŸå€¤ã‚ã‚Šãƒ‡ãƒ¼ã‚¿			1byte
+		"SU",									# ãƒ¦ãƒ¼ã‚¶ãƒ¼ã‚¹ã‚¿ãƒƒã‚¯é ˜åŸŸ	4byte
+		"SI",									# å‰²ã‚Šè¾¼ã¿ã‚¹ã‚¿ãƒƒã‚¯			4byte
+		"C$VECT",							# å¯å¤‰ãƒ™ã‚¯ã‚¿ãƒ†ãƒ¼ãƒ–ãƒ«(å‰²ã‚Šè¾¼ã¿ãƒãƒ³ãƒ‰ãƒ©)
+		"C$DSEC",							# åˆæœŸå€¤ã‚ã‚Šãƒ‡ãƒ¼ã‚¿ã‚»ã‚¯ã‚·ãƒ§ãƒ³ãƒ†ãƒ¼ãƒ–ãƒ«
+		"C$BSEC",							# åˆæœŸå€¤ãªã—ãƒ‡ãƒ¼ã‚¿ã‚»ã‚¯ã‚·ãƒ§ãƒ³ç”¨ãƒ†ãƒ¼ãƒ–ãƒ«
+		"FIXEDVECT",					# å›ºå®šãƒ™ã‚¯ã‚¿ãƒ†ãƒ¼ãƒ–ãƒ«(å‰²ã‚Šè¾¼ã¿ãƒãƒ³ãƒ‰ãƒ©)
+		"PResetPRG",					# ãƒªã‚»ãƒƒãƒˆãƒ™ã‚¯ã‚¿
+		".symtab",						# ã‚·ãƒ³ãƒœãƒ«ãƒ†ãƒ¼ãƒ–ãƒ«
+		".debug_info",				# ãƒ‡ãƒãƒƒã‚°æƒ…å ±
 		".debug_abbrev",			# ?
 		".debug_line",				# ?
 		".debug_pubnames",		# ?
 		".debug_aranges",			# ?
 		".debug_frame",				# ?
 		".debug_loc",					# ?
-		".strtab",						# •¶Žš—ñƒe[ƒuƒ‹
-		".shstrtab"						# ƒZƒNƒVƒ‡ƒ“•¶Žš—ñ
+		".strtab",						# æ–‡å­—åˆ—ãƒ†ãƒ¼ãƒ–ãƒ«
+		".shstrtab"						# ã‚»ã‚¯ã‚·ãƒ§ãƒ³æ–‡å­—åˆ—
 	]
 
 	class RXLinker < Linker
@@ -58,7 +58,7 @@ module ELF
 	    end
 
 			# ELF header
-	    out_elf_header(link_f, elf_first, elf_objects)
+			out_elf_header(link_f, elf_first, elf_objects)
 
 			# write secions
 			RX_SECTIONS.each do |section_name|

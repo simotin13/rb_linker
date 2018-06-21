@@ -51,14 +51,33 @@ module ELF
 			elf_header << elf_header_info[:type]
 			elf_header << elf_header_info[:machine]
 			elf_header << EV_CURRENT
-
-
 		end
 
 	  def out_elf_header link_f, elf_first, elf_objects
 	    elf_header = elf_first.ident
-	    #elf_header << elf_first.ident
 	    link_f.write(elf_header.pack("C*"))
+	    elf_class = elf_first.elf_class
+	    endian = elf_first.ident[ELF_IDENT_OFFSET_ENDIAN] == ELF_LITTLE_ENDIAN
+
+	    case elf_class
+	    when ELF_CLASS_ELF32
+		    link_f.write(elf_first.elf_type.to_bin16(endian))
+		    link_f.write(elf_first.elf_machine.to_bin16(endian))
+		    link_f.write(elf_first.elf_version.to_bin32(endian))
+		    link_f.write(elf_first.elf_entry.to_bin32(endian))
+		    link_f.write(elf_first.elf_program_h_offset.to_bin32(endian))
+		    link_f.write(elf_first.elf_section_h_offset.to_bin32(endian))
+		    link_f.write(elf_first.elf_flags.to_bin32(endian))
+		    link_f.write(elf_first.elf_h_size.to_bin16(endian))
+		    link_f.write(elf_first.elf_program_h_size.to_bin16(endian))
+		    link_f.write(elf_first.elf_program_h_size.to_bin16(endian))
+		    link_f.write(elf_first.elf_program_h_num.to_bin16(endian))
+		    link_f.write(elf_first.elf_section_h_size.to_bin16(endian))
+		    link_f.write(elf_first.elf_section_h_num.to_bin16(endian))
+		    link_f.write(elf_first.elf_section_name_idx.to_bin16(endian))
+	    when ELF_CLASS_ELF64
+	    else
+	    end
 	  end
 	end
 end

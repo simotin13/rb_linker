@@ -3,8 +3,10 @@ require './machine_arch_list'
 
 module ELF
 	class Reader
-		attr_reader :section_h_map, :ident, :elf_class, :elf_endian, :elf_version, :os_abi
-
+		attr_reader :section_h_map, :ident, :elf_class, :elf_endian, :elf_version, :os_abi,
+							:elf_type, :elf_machine, :elf_version, :elf_entry, :elf_program_h_offset,
+							:elf_section_h_offset, :elf_flags, :elf_h_size, :elf_program_h_size,
+							:elf_program_h_num, :elf_section_h_size, :elf_section_h_num, :elf_section_name_idx
 
 		# ============================================================================
 		# Load Object File
