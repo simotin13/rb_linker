@@ -38,34 +38,49 @@ module ELF
 
 	  def link filepath, elf_objects
 	    check_elf_header(elf_objects)
-
-	    elf_first = elf_objects.first
-	    elf_objects = elf_objects
 	    link_f = open(filepath, "wb")
 			section_size = 0
 
-			section_map = {}
-	    elf_objects.each do |elf_object|
-	    	RX_SECTIONS.each do |section_name|
-	    		sec = elf_object.get_section_data(section_name)
-	    		next if sec.nil?
-	    		if section_map.has_key?(section_name)
-	    			section_map[section_name].concat(sec)
-	    		else
-		    		section_map[section_name] = sec
-	    		end
-	    	end
-	    end
-
-			# ELF header
-			out_elf_header(link_f, elf_first, elf_objects)
-
-			# write secions
-			RX_SECTIONS.each do |section_name|
-				sec = section_map[section_name]
-				link_f.write(sec.pack("C*"))	unless sec.nil?
+			# get symbol_name list from elf objects.
+			section_objects = {}
+			elf_objects.each do |elf_object|
+				elf_object.section_h_map.each_pair do |section_name, section_info|
+					section_objects[section_name] = [] if section_objects[section_name].nil?
+					section_bin = elf_object.get_section_data(section_name)
+					section_objects[section_name] << {info: section_info, bin: section_bin}
+				end
 			end
 
+			linked_section_map = {}
+			offset = 0
+			section_objects.each_pair do |section_name, secions|
+				next if secions.empty?
+				secions.each do |section|
+					if linked_section_map.has_key?(section_name)
+						# セクションサイズを加算
+						linked_section_map[section_name][:info][:size] += section[:info][:size]
+						linked_section_map[section_name][:bin].concat(section[:bin])
+					else
+						linked_section_map[section_name] = {info: section[:info], bin: section[:bin]}
+					end
+				end
+				# オフセットサイズ情報を更新
+				offset += linked_section_map[section_name][:info][:size]
+			end
+
+			# ELF header
+			out_elf_header(link_f, elf_objects.first, elf_objects)
+
+			# write secion headers
+			# TODO セクションヘッダの情報出力が必要
+			linked_section_map.each_pair do |section_name, secion|
+				link_f.write(secion[:bin].pack("C*"))	unless secion.nil?
+			end
+
+			# write secions
+			linked_section_map.each_pair do |section_name, secion|
+				link_f.write(secion[:bin].pack("C*"))	unless secion.nil?
+			end
 	  end
 	end
 end
