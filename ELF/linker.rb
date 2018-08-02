@@ -33,25 +33,6 @@ module ELF
 			# Section Header
 
 	  end
-		def make_ELF_header elf_header_info
-			elf_header = []
-
-			# Magic Number
-			elf_header << 0x7F
-			elf_header << "ELF"
-
-			elf_header << elf_header_info[:elf_class]
-			elf_header << elf_header_info[:elf_class]
-			elf_header << elf_header_info[:elf_endian]
-			elf_header << ELF_CURRENT_VERSION
-			elf_header << elf_header_info[:os_abi]
-			elf_header << 0x01	# ABI Version is fixed to 0
-
-			# TODO Endian Array.
-			elf_header << elf_header_info[:type]
-			elf_header << elf_header_info[:machine]
-			elf_header << EV_CURRENT
-		end
 
 	  def out_elf_header link_f, elf_first, elf_objects
 	    elf_header = elf_first.ident
@@ -70,12 +51,12 @@ module ELF
 		    link_f.write(elf_first.elf_flags.to_bin32(endian))
 		    link_f.write(elf_first.elf_h_size.to_bin16(endian))
 		    link_f.write(elf_first.elf_program_h_size.to_bin16(endian))
-		    link_f.write(elf_first.elf_program_h_size.to_bin16(endian))
 		    link_f.write(elf_first.elf_program_h_num.to_bin16(endian))
 		    link_f.write(elf_first.elf_section_h_size.to_bin16(endian))
 		    link_f.write(elf_first.elf_section_h_num.to_bin16(endian))
 		    link_f.write(elf_first.elf_section_name_idx.to_bin16(endian))
 	    when ELF_CLASS_ELF64
+				throw "not implemented"
 	    else
 	    end
 	  end
