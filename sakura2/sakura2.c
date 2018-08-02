@@ -12,10 +12,13 @@
 
 extern int add(int a, int b);
 
+extern int ext_hoge;
 void main(void)
 {
 	int ret;
+	ext_hoge = 0x1234;
 	ret = add(1,2);
+	while(1);
 }
 
 #ifdef __cplusplus
