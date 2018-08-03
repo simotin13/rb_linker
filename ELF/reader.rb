@@ -430,18 +430,24 @@ module ELF
 			@symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 			# DEBUG
-			#show_symbol_table(@symbol_table)
+			show_symbol_table(@symbol_table)
 
-			# get relocation section info(.rel.text, .rel.data)
-			# TODO .rela
+			# get relocation section info(.rela.*, .rel.*)
 			@rel_sections = {}
-			if @section_h_map.has_key? ".rel.text"
-				@rel_sections[".rel.text"] = get_rel_section(@section_h_map[".rel.text"], @symbol_table)
-				show_rel_section(".rel.text", @rel_sections[".rel.text"])
-			end
-			if @section_h_map.has_key? ".rel.data"
-				@rel_sections[".rel.data"] = get_rel_section(@section_h_map[".rel.data"], @symbol_table)
-				show_rel_section(".rel.data", @rel_sections[".rel.data"])
+			section_names = @section_h_map.keys
+			section_names.each do |section_name|
+				# search .rela.* section
+				# Elf32_Rela has `r_addend`, besides Elf32_Rel.
+				unless section_name.match(/.rela/).nil?
+					@rel_sections[section_name] = get_rel_section(@section_h_map[section_name], @symbol_table, true)
+					show_rel_section(section_name, @rel_sections[section_name])
+				end
+
+				# search .rela.* section
+				unless section_name.match(/.rel/).nil?
+					@rel_sections[section_name] = get_rel_section(@section_h_map[section_name], @symbol_table, false)
+					show_rel_section(section_name, @rel_sections[section_name])
+				end
 			end
 
 			# DEBUG
@@ -510,12 +516,14 @@ module ELF
 					type_str = "SYMTAB"
 				when 3
 					type_str = "STRTAB"
+				when 4
+					type_str = "*UNDEF*"
 				when 8
 					type_str = "NOBITS"
 				when 9
 					type_str = "REL"
 				else
-					type_str = "*UNDEF*"
+					type_str = "UnKnown"
 				end
 				type_str = type_str.ljust(15)
 
@@ -683,7 +691,7 @@ module ELF
 		# ============================================================================
 		# get .rel.text section
 		# ============================================================================
-		def get_rel_section rel_section_info, symbol_table
+		def get_rel_section rel_section_info, symbol_table, is_rela
 			offset = rel_section_info[:offset]
 			size = rel_section_info[:size]
 			rel_section = @bin[offset, size]
@@ -703,12 +711,18 @@ module ELF
 				offset += ELF_SIZE_WORD
 				left_len -= ELF_SIZE_WORD
 
+				r_addend = rel_section[offset, ELF_SIZE_WORD] if is_rela
+				offset += ELF_SIZE_WORD
+				left_len -= ELF_SIZE_WORD
+
 				r_symbol = (r_info & 0xFFFFFF00) >> 8
 				r_type = r_info & 0xFF
+				h[:is_rela] = is_rela
 				h[:info] = r_info
 				h[:symbol] = r_symbol
 				h[:type] = r_type
 				h[:name] = symbol_table[r_symbol][:name_str]
+				h[:r_addend] = r_addend
 				rel_symbol_list << h
 			end
 			rel_symbol_list
