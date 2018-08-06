@@ -44,6 +44,14 @@ module ELF
 			# get symbol_name list from elf objects.
 			section_objects = {}
 			elf_objects.each do |elf_object|
+				elf_object.symbol_table.each do |sym|
+					if sym[:type] == 2 # FUNC
+						#puts sym
+						puts elf_object.section_h_map.keys
+						#section_info[:size]
+					end
+				end
+				
 				elf_object.section_h_map.each_pair do |section_name, section_info|
 					section_objects[section_name] = [] if section_objects[section_name].nil?
 					section_bin = elf_object.get_section_data(section_name)
@@ -53,11 +61,32 @@ module ELF
 
 			linked_section_map = {}
 			offset = 0
+
+			# PA → VA のマップ
+			va_map = []
+			va_map << {sections: ["B_1", "R_1", "B_2", "R_2", "B", "R", "SU", "SI"], address:0x00000004}
+			va_map << {sections: ["PResetPRG"], address:0x0FFF00000}
+			va_map << {sections: ["C_1", "C_2", "C", "C$DSEC", "C$BSEC", "C$INIT", "C$VTBL", 
+														"C$VECT","D_1", "D_2", "D", "P", "PIntPRG", "W_1", "W_2", "W", "L"],
+														address:0x00000004}
+			va_map << {sections: ["FIXEDVECT"], address:0x0FFFFFFD0}
+			
+			va_map.each do |groups|
+				if groups.include?(今のセクション名)
+				else
+					throw "Secion not found."
+				end
+
 			section_objects.each_pair do |section_name, secions|
 				next if secions.empty?
 				secions.each do |section|
+
+					# TODO シンボル名に対応するセクション名はどうやって取得する？
+					
+				
 					if linked_section_map.has_key?(section_name)
 						# セクションサイズを加算
+						linked_section_map[section_name][:info][:size] += section[:info][:size]
 						linked_section_map[section_name][:info][:size] += section[:info][:size]
 						linked_section_map[section_name][:bin].concat(section[:bin])
 					else
@@ -74,7 +103,7 @@ module ELF
 			# write secion headers
 			# TODO セクションヘッダの情報出力が必要
 			linked_section_map.each_pair do |section_name, secion|
-				link_f.write(secion[:bin].pack("C*"))	unless secion.nil?
+				# link_f.write(secion[:bin].pack("C*"))	unless secion.nil?
 			end
 
 			# write secions
