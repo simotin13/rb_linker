@@ -39,76 +39,87 @@ module ELF
 	  def link filepath, elf_objects
 	    check_elf_header(elf_objects)
 	    link_f = open(filepath, "wb")
-			section_size = 0
 
-			# get symbol_name list from elf objects.
-			section_objects = {}
+			linked_section_map = {}
+
+			linked_offset = 0
 			elf_objects.each do |elf_object|
-				elf_object.symbol_table.each do |sym|
-					if sym[:type] == 2 # FUNC
-						#puts sym
-						puts elf_object.section_h_map.keys
-						#section_info[:size]
-					end
-				end
-				
+				# 同一のセクションのデータを配列としてまとめる
 				elf_object.section_h_map.each_pair do |section_name, section_info|
-					section_objects[section_name] = [] if section_objects[section_name].nil?
+					puts section_info if section_info[:name] == ".symtab"
+
+					# セクション内の関連するシンボルを.symtblの情報から取得し、
+					# シンボルテーブルに存在するシンボルはオフセットを更新する
 					section_bin = elf_object.get_section_data(section_name)
-					section_objects[section_name] << {info: section_info, bin: section_bin}
+					elf_object.symbol_table.map do |sym_info|
+						if sym_info[:st_shidx] == section_info[:idx]
+							section_info[:offset] += linked_offset
+						end
+					end
+
+					# セクションサイズ分オフセットを更新
+					linked_offset += section_info[:size]
+
+					# セクション情報の初期化
+ 					if linked_section_map[section_name].nil?
+						linked_section_map[section_name] = {section_info: section_info}
+					end
+
+					# 同一セクションのマージ
+					if linked_section_map[section_name][:section_info][:name] == section_info[:name]
+						# サイズ情報を更新
+						linked_section_map[section_name][:section_info][:size] += section_info[:size]
+						#puts section_info
+					end
+
+					# .symtab, .strtab はテーブル情報を元にバイナリを出力する
+					next if section_info[:name] == ".symtab"
+					next if section_info[:name] == ".strtab"
+
+					# セクションデータ取得し結合する
+					bin = elf_object.get_section_data(section_name)
+					next if bin.nil?
+
+					linked_section_map[section_name][:bin] = [] if linked_section_map[section_name][:bin].nil?
+					linked_section_map[section_name][:bin].concat(bin)
 				end
 			end
 
-			linked_section_map = {}
-			offset = 0
+			# 未解決のシンボルの解決を行う
+			linked_section_map.each_pair do |section_name, secion_info|
+				#puts secion_info
+			end
 
 			# PA → VA のマップ
 			va_map = []
 			va_map << {sections: ["B_1", "R_1", "B_2", "R_2", "B", "R", "SU", "SI"], address:0x00000004}
 			va_map << {sections: ["PResetPRG"], address:0x0FFF00000}
-			va_map << {sections: ["C_1", "C_2", "C", "C$DSEC", "C$BSEC", "C$INIT", "C$VTBL", 
+			va_map << {sections: ["C_1", "C_2", "C", "C$DSEC", "C$BSEC", "C$INIT", "C$VTBL",
 														"C$VECT","D_1", "D_2", "D", "P", "PIntPRG", "W_1", "W_2", "W", "L"],
 														address:0x00000004}
 			va_map << {sections: ["FIXEDVECT"], address:0x0FFFFFFD0}
-			
+
 			va_map.each do |groups|
-				if groups.include?(今のセクション名)
+				if groups.include?("今のセクション名")
 				else
-					throw "Secion not found."
+					#throw "Secion not found."
 				end
-
-			section_objects.each_pair do |section_name, secions|
-				next if secions.empty?
-				secions.each do |section|
-
-					# TODO シンボル名に対応するセクション名はどうやって取得する？
-					
-				
-					if linked_section_map.has_key?(section_name)
-						# セクションサイズを加算
-						linked_section_map[section_name][:info][:size] += section[:info][:size]
-						linked_section_map[section_name][:info][:size] += section[:info][:size]
-						linked_section_map[section_name][:bin].concat(section[:bin])
-					else
-						linked_section_map[section_name] = {info: section[:info], bin: section[:bin]}
-					end
-				end
-				# オフセットサイズ情報を更新
-				offset += linked_section_map[section_name][:info][:size]
 			end
 
 			# ELF header
 			out_elf_header(link_f, elf_objects.first, elf_objects)
 
+			# TODO Program Headers
+
 			# write secion headers
 			# TODO セクションヘッダの情報出力が必要
-			linked_section_map.each_pair do |section_name, secion|
+			linked_section_map.each_pair do |section_name, section|
 				# link_f.write(secion[:bin].pack("C*"))	unless secion.nil?
 			end
 
 			# write secions
 			linked_section_map.each_pair do |section_name, secion|
-				link_f.write(secion[:bin].pack("C*"))	unless secion.nil?
+				link_f.write(secion[:bin].pack("C*"))	unless secion[:bin].nil?
 			end
 	  end
 	end

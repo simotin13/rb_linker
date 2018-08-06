@@ -368,7 +368,7 @@ module ELF
 			pos += ELF_SIZE_WORD
 
 			# Index of related section
-			section_info[:link] = section_header[pos, ELF_SIZE_WORD].to_i
+			section_info[:related_section_idx] = section_header[pos, ELF_SIZE_WORD].to_i
 			pos += ELF_SIZE_WORD
 
 			# Depends on section type.
@@ -420,7 +420,7 @@ module ELF
 			end
 
 			# DEBUG
-			show_sections_info(@section_h_map.values)
+			#show_sections_info(@section_h_map.values)
 
 			# get .strtab section
 			# until set @strtab_section, can't use get_strtab_string.
@@ -431,7 +431,7 @@ module ELF
 			@symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 			# DEBUG
-			show_symbol_table(@symbol_table)
+			#show_symbol_table(@symbol_table)
 
 			# get relocation section info(.rela.*, .rel.*)
 			@rel_sections = {}
@@ -441,13 +441,13 @@ module ELF
 				# Elf32_Rela has `r_addend`, besides Elf32_Rel.
 				unless section_name.match(/.rela/).nil?
 					@rel_sections[section_name] = get_rel_section(@section_h_map[section_name], @symbol_table, true)
-					show_rel_section(section_name, @rel_sections[section_name])
+					#show_rel_section(section_name, @rel_sections[section_name])
 				end
 
 				# search .rela.* section
 				unless section_name.match(/.rel/).nil?
 					@rel_sections[section_name] = get_rel_section(@section_h_map[section_name], @symbol_table, false)
-					show_rel_section(section_name, @rel_sections[section_name])
+					#show_rel_section(section_name, @rel_sections[section_name])
 				end
 			end
 
@@ -530,7 +530,7 @@ module ELF
 
 				# TODO Link
 				# link dec format.
-				lk_str = sprintf("%d", section_info[:link]).ljust(4)
+				lk_str = sprintf("%d", section_info[:related_section_idx]).ljust(4)
 				info_str = sprintf("%d", section_info[:info]).ljust(2)
 				al_str = sprintf("%d", section_info[:addr_align])
 				line = "  [#{idx_str}]"
