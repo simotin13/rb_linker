@@ -10,6 +10,9 @@ module ELF
 	ELF_SIZE_OFFSET_32	= 4
 	ELF_SIZE_OFFSET_64	= 8
 
+	ELF_SIZE_ELF32_HEADER      = 0x34
+	ELF_SIZE_ELF32_PROG_HEADER = 0x20
+
 	# ============================================================================
 	# ELF Identifer
 	# ============================================================================
@@ -94,4 +97,23 @@ module ELF
 	ELF_ET_DYN	= 3
 	ELF_ET_CORE	= 4
 
+	ELF_FLG_WRITE	  = 0x01
+	ELF_FLG_ALLOC   = 0x02
+	ELF_FLG_EXECUTE = 0x04
+	ELF_FLG_MERGE   = 0x10
+
+	# ============================================================================
+	# Program Header Definitions
+	# ============================================================================
+	ELF_PT_NULL    = 0
+	ELF_PT_LOAD    = 1
+	ELF_PT_DYNAMIC = 2
+	ELF_PT_INTERP  = 3
+	ELF_PT_NOTE    = 4
+	ELF_PT_SHLIB   = 5
+	ELF_PT_PHDR    = 6
+
+	ELF_PF_X       = 0x01
+	ELF_PF_W       = 0x02
+	ELF_PF_R       = 0x04
 end

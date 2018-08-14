@@ -3,7 +3,7 @@ require './machine_arch_list'
 
 module ELF
 	class Reader
-		attr_reader :section_h_map, :ident, :elf_class, :elf_endian, :elf_version, :os_abi,
+		attr_accessor :section_h_map, :ident, :elf_class, :elf_endian, :elf_version, :os_abi,
 							:elf_type, :elf_machine, :elf_version, :elf_entry, :elf_program_h_offset,
 							:elf_section_h_offset, :elf_flags, :elf_h_size, :elf_program_h_size,
 							:elf_program_h_num, :elf_section_h_size, :elf_section_h_num, :elf_section_name_idx,
@@ -108,6 +108,9 @@ module ELF
 
 			# create section name - section index map.
 			initialize_section_h_map
+
+			# DEBUG
+			#show_elf_header
 
 			get_program_header
 		end
@@ -391,7 +394,7 @@ module ELF
 			# =======================================================
 			pos = @elf_section_h_offset + (@elf_section_name_idx * @elf_section_h_size)
 			names_section_header = @bin[pos, @elf_section_h_size]
-			section_info = get_section_info names_section_header
+			section_info = get_section_info(names_section_header)
 			names_section_pos  = section_info[:offset]
 			names_section_size = section_info[:size]
 			names_section = @bin[names_section_pos, names_section_size]
@@ -495,10 +498,10 @@ module ELF
 				# ======================================================
 				flag_val = section_info[:flags]
 				flg_str = ""
-				flg_str += "W" if (flag_val & 0x01) != 0	# WRITE
-				flg_str += "A" if (flag_val & 0x02) != 0	# ALLOC
-				flg_str += "X" if (flag_val & 0x04) != 0	# EXECINSTR
-				flg_str += "M" if (flag_val & 0x10) != 0	# MERGE
+				flg_str += "W" if (flag_val & ELF_FLG_WRITE) != 0	# WRITE
+				flg_str += "A" if (flag_val & ELF_FLG_ALLOC) != 0	# ALLOC
+				flg_str += "X" if (flag_val & ELF_FLG_EXECUTE) != 0	# EXECINSTR
+				flg_str += "M" if (flag_val & ELF_FLG_MERGE) != 0	# MERGE
 				flg_str += "S" if (flag_val & 0x20) != 0	# STRINGS
 				flg_str += "I" if (flag_val & 0x40) != 0	# INFO_LINK
 				flg_str += "L" if (flag_val & 0x80) != 0	# LINK_ORDER
@@ -732,9 +735,6 @@ module ELF
 		end
 
 		def get_program_header
-			puts "elf_program_h_offset: #{@elf_program_h_offset}"
-			puts "elf_program_h_num   : #{@elf_program_h_num}"
-			puts "elf_program_h_size  : #{@elf_program_h_size}"
 			total_h_size = @elf_program_h_num * @elf_program_h_size
 			program_h_table = @bin[@elf_program_h_offset, total_h_size]
 

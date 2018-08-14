@@ -8,57 +8,71 @@ module ELF
 	    true
 	  end
 
-	  def link filepath, elf_objects
-	    check_elf_header(elf_objects)
-
-	    elf_first = elf_objects.first
-	    elf_objects = elf_objects
-	    link_f = open(filepath, "wb")
-			section_size = 0
-
-			# .text section
-			text_section = []
-	    elf_objects.each do |elf_object|
-	    	text_sect = elf_object.get_section_data(".text")
-	    	next if text_sect.nil?
-	      text_section.concat(elf_object.get_section_data(".text"))
-	    end
-
-			# ELF header
-	    out_elf_header(link_f, elf_first, elf_objects)
-
-			# text section
-			link_f.write(text_section.pack("C*"))
-
-			# Section Header
-
-	  end
-
-	  def out_elf_header link_f, elf_first, elf_objects
-	    elf_header = elf_first.ident
-	    link_f.write(elf_header.pack("C*"))
-	    elf_class = elf_first.elf_class
-	    endian = elf_first.ident[ELF_IDENT_OFFSET_ENDIAN] == ELF_LITTLE_ENDIAN
+		# ==========================================================================
+		# write program headers
+		# ==========================================================================
+	  def write_elf_header(link_f, elf_object)
+			wsize = 0
+	    elf_header = elf_object.ident
+	    wsize += link_f.write(elf_header.pack("C*"))
+	    elf_class = elf_object.elf_class
+	    endian = elf_object.ident[ELF_IDENT_OFFSET_ENDIAN] == ELF_LITTLE_ENDIAN
 
 	    case elf_class
 	    when ELF_CLASS_ELF32
-		    link_f.write(elf_first.elf_type.to_bin16(endian))
-		    link_f.write(elf_first.elf_machine.to_bin16(endian))
-		    link_f.write(elf_first.elf_version.to_bin32(endian))
-		    link_f.write(elf_first.elf_entry.to_bin32(endian))
-		    link_f.write(elf_first.elf_program_h_offset.to_bin32(endian))
-		    link_f.write(elf_first.elf_section_h_offset.to_bin32(endian))
-		    link_f.write(elf_first.elf_flags.to_bin32(endian))
-		    link_f.write(elf_first.elf_h_size.to_bin16(endian))
-		    link_f.write(elf_first.elf_program_h_size.to_bin16(endian))
-		    link_f.write(elf_first.elf_program_h_num.to_bin16(endian))
-		    link_f.write(elf_first.elf_section_h_size.to_bin16(endian))
-		    link_f.write(elf_first.elf_section_h_num.to_bin16(endian))
-		    link_f.write(elf_first.elf_section_name_idx.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_type.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_machine.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_version.to_bin32(endian))
+		    wsize += link_f.write(elf_object.elf_entry.to_bin32(endian))
+		    wsize += link_f.write(elf_object.elf_program_h_offset.to_bin32(endian))
+		    wsize += link_f.write(elf_object.elf_section_h_offset.to_bin32(endian))
+		    wsize += link_f.write(elf_object.elf_flags.to_bin32(endian))
+		    wsize += link_f.write(elf_object.elf_h_size.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_program_h_size.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_program_h_num.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_section_h_size.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_section_h_num.to_bin16(endian))
+		    wsize += link_f.write(elf_object.elf_section_name_idx.to_bin16(endian))
 	    when ELF_CLASS_ELF64
 				throw "not implemented"
 	    else
+				throw "unexpected class"
 	    end
+			wsize
 	  end
+
+		# ==========================================================================
+		# write program header
+		# ==========================================================================
+		def write_prog_header(link_f, program_header)
+			wsize = 0
+			wsize += link_f.write(program_header[:p_type].to_bin32)
+			wsize += link_f.write(program_header[:p_offset].to_bin32)
+			wsize += link_f.write(program_header[:p_vaddr].to_bin32)
+			wsize += link_f.write(program_header[:p_paddr].to_bin32)
+			wsize += link_f.write(program_header[:p_filesz].to_bin32)
+			wsize += link_f.write(program_header[:p_memsz].to_bin32)
+			wsize += link_f.write(program_header[:p_flags].to_bin32)
+			wsize += link_f.write(program_header[:p_align].to_bin32)
+			wsize
+		end
+
+		# ==========================================================================
+		# write section header
+		# ==========================================================================
+		def write_section_header(link_f, section_info)
+			wsize = 0
+			wsize += link_f.write(section_info[:name_idx].to_bin32)
+			wsize += link_f.write(section_info[:type].to_bin32)
+			wsize += link_f.write(section_info[:flags].to_bin32)
+			wsize += link_f.write(section_info[:va_address].to_bin32)
+			wsize += link_f.write(section_info[:offset].to_bin32)
+			wsize += link_f.write(section_info[:size].to_bin32)
+			wsize += link_f.write(section_info[:related_section_idx].to_bin32)
+			wsize += link_f.write(section_info[:info].to_bin32)
+			wsize += link_f.write(section_info[:addr_align].to_bin32)
+			wsize += link_f.write(section_info[:entry_size].to_bin32)
+			wsize
+		end
 	end
 end
