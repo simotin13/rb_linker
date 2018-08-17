@@ -7,7 +7,7 @@ module ELF
 							:elf_type, :elf_machine, :elf_version, :elf_entry, :elf_program_h_offset,
 							:elf_section_h_offset, :elf_flags, :elf_h_size, :elf_program_h_size,
 							:elf_program_h_num, :elf_section_h_size, :elf_section_h_num, :elf_section_name_idx,
-							:symbol_table
+							:symbol_table, :rel_sections
 
 		# ============================================================================
 		# Load Object File
@@ -444,13 +444,15 @@ module ELF
 				# Elf32_Rela has `r_addend`, besides Elf32_Rel.
 				unless section_name.match(/.rela/).nil?
 					@rel_sections[section_name] = get_rel_section(@section_h_map[section_name], @symbol_table, true)
-					#show_rel_section(section_name, @rel_sections[section_name])
+					show_rel_section(section_name, @rel_sections[section_name])
+					next
 				end
 
 				# search .rela.* section
 				unless section_name.match(/.rel/).nil?
 					@rel_sections[section_name] = get_rel_section(@section_h_map[section_name], @symbol_table, false)
 					#show_rel_section(section_name, @rel_sections[section_name])
+					next
 				end
 			end
 
@@ -717,7 +719,15 @@ module ELF
 				offset += ELF_SIZE_WORD
 				left_len -= ELF_SIZE_WORD
 
-				r_addend = rel_section[offset, ELF_SIZE_WORD] if is_rela
+				if is_rela
+					bytes = rel_section[offset, ELF_SIZE_WORD]
+					addr = bytes[0]
+					addr += bytes[1] << 8
+					addr += bytes[2] << 16
+					addr += bytes[3] << 24
+					r_addend = addr
+				end
+
 				offset += ELF_SIZE_WORD
 				left_len -= ELF_SIZE_WORD
 
@@ -725,7 +735,7 @@ module ELF
 				r_type = r_info & 0xFF
 				h[:is_rela] = is_rela
 				h[:info] = r_info
-				h[:symbol] = r_symbol
+				h[:symbol_idx] = r_symbol
 				h[:type] = r_type
 				h[:name] = symbol_table[r_symbol][:name_str]
 				h[:r_addend] = r_addend
