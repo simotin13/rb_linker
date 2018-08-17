@@ -2,17 +2,16 @@ require 'elf'
 require 'linker'
 module ELF
 
-	RX_SECTIONS = [
-		"P",									# プログラム領域				1byte
-		"SU",									# ユーザースタック領域	4byte
-		"SI",									# 割り込みスタック			4byte
-		"FIXEDVECT",					# 固定ベクタテーブル(割り込みハンドラ)
-		"PResetPRG",					# リセットベクタ
-		".symtab",						# シンボルテーブル
-		".strtab",						# 文字列テーブル
-		".shstrtab"						# セクション文字列
-	]
-
+	# ============================================================================
+	# P		プログラム領域				1byte
+	#	"SU",									# ユーザースタック領域	4byte
+	#	"SI",									# 割り込みスタック			4byte
+	#	"FIXEDVECT",					# 固定ベクタテーブル(割り込みハンドラ)
+	#	"PResetPRG",					# リセットベクタ
+	#	".symtab",						# シンボルテーブル
+	#	".strtab",						# 文字列テーブル
+	#	".shstrtab"						# セクション文字列
+	# ============================================================================
 	class RXLinker < Linker
 
 	  def check_elf_header elf_objects
@@ -44,16 +43,23 @@ module ELF
 
 			linked_offset = 0
 			symbols = []
+
 			# ======================================================
 			# 各オブジェクトファイル毎にリンク処理を行う
 			# ======================================================
+			rel_secions = {}
 			elf_objects.each do |elf_object|
 				tmp_offset = 0
 
-				# TODO とりあえずスキップ
+				symbols.concat(elf_object.symbol_table)
+
+				# リンクする必要がないセクションはここで削除
 				elf_object.section_h_map.delete("$iop")
-				elf_object.section_h_map.delete(".relaPResetPRG")
-				elf_object.section_h_map.delete(".relaFIXEDVECT")
+				#elf_object.section_h_map.delete(".relaPResetPRG")
+				#elf_object.section_h_map.delete(".relaFIXEDVECT")
+
+				# リロケーションの情報を保持しておく
+				rel_secions = elf_object.rel_sections
 
 				# 同一のセクションのデータを配列としてまとめる
 				elf_object.section_h_map.each_pair do |section_name, section_info|
@@ -69,11 +75,6 @@ module ELF
 						linked_section_map[section_name][:section_info][:size] += section_info[:size]
 					end
 
-					# .symtab, .strtab はテーブル情報を元にバイナリを出力する
-					# TODO 文字列、シンボル情報を更新する必要がある
-					#next if section_info[:name] == ".symtab"
-					#next if section_info[:name] == ".strtab"
-
 					# セクションデータ取得し結合する
 					secion_bin = elf_object.get_section_data(section_name)
 					if secion_bin.nil?
@@ -88,17 +89,7 @@ module ELF
 				linked_offset += tmp_offset
 
 				# シンボル情報更新
-				# マージされたセクションの情報でシンボルテーブルを更新する
-				elf_object.symbol_table.each do |symbol|
-					section_pair = elf_object.section_h_map.find {|key,val| val[:st_shidx] == symbol[:st_shndx]}
-					next if section_pair.nil?
-					section_info = section_pair[1]
-					# 実体がない(size=0)場合はオフセットは更新しない
-					if symbol[:st_size] != 0
-						symbol[:st_value] += section_info[:offset]
-					end
-				end
-
+				# TODO マージされたセクションの情報でシンボルテーブルを更新する
 			end
 
 			# ========================================================================
@@ -118,7 +109,6 @@ module ELF
 					break if section_name == name
 					prog_offset += section[:bin].size
 				end
-				puts prog_offset
 				program_h_info[:p_offset] = prog_offset
 
 				# とりあえずROM/RAM展開はなし
@@ -160,20 +150,49 @@ module ELF
 			# TODO
 			linked_header.elf_section_name_idx = 0
 
-			# セクションヘッダ出力オフセット
+			# ========================================================================
+			# リロケーションの更新
+			# ========================================================================
+			reset_section = linked_section_map[".relaPResetPRG"]
+			fixvect_section = linked_section_map[".relaFIXEDVECT"]
+			rel_secions.each do |name, rel_section|
+				rel_section.each do |rel_info|
+					sym_info = symbols[rel_info[:symbol_idx]]
+					target_section_name = name.slice(5..-1)
+					target_section = linked_section_map[target_section_name]
+					case rel_info[:type]
+					when 0x01
+						# 4byte のアドレスを書き換え
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
+						ref_addr = ref_section[1][:section_info][:va_address]
+						ref_addr += sym_info[:st_value]
+						bytes = ref_addr.to_bin32_ary(true)
+						offset = rel_info[:offset]
+						target_section[:bin][offset + 0] = bytes[0]
+						target_section[:bin][offset + 1] = bytes[1]
+						target_section[:bin][offset + 2] = bytes[2]
+						target_section[:bin][offset + 3] = bytes[3]
+					when 0x0B
+						rel_addr = rel_info[:r_addend] - rel_info[:offset] + 1
+						target_section[:bin][rel_info[:offset]] = rel_addr
+					else
+						throw "Unexpected rel type, #{rel_info[:type]}"
+					end
+				end
+			end
+
+			# ========================================================================
+			# セクションヘッダ出力オフセット計算
+			# ========================================================================
 			sections_size  = 0
 			sections_count = 0
 			linked_section_map.each_pair do |section_name, section|
-				# TODO とりあえずスキップ
-				next if section_name == "$iop"
-				next if section_name == ".relaPResetPRG"
-				next if section_name == ".relaFIXEDVECT"
-
 				unless section[:bin].nil?
 					sections_size += section[:bin].size
 					sections_count += 1
 				end
 			end
+
 			linked_header.elf_section_h_offset =
 				ELF_SIZE_ELF32_HEADER + (prog_h_size*prog_headers.length) + sections_size
 			linked_header.elf_section_h_num = sections_count
@@ -188,11 +207,9 @@ module ELF
 			prog_headers.each do |prog_header|
 				cur_pos += write_prog_header(link_f, prog_header)
 			end
-			puts "cur_pos:#{cur_pos}"
 
 			# write secions
 			linked_section_map.each_pair do |section_name, section|
-				puts section_name
 				# セクションのオフセット位置更新
 				section[:section_info][:offset] = cur_pos
 				cur_pos += link_f.write(section[:bin].pack("C*"))
@@ -213,12 +230,6 @@ module ELF
 			#write_section_header(link_f, empty_section)
 
 			linked_section_map.each_pair do |section_name, section|
-				# TODO とりあえずスキップ
-				next if section_name == "$iop"
-				next if section_name == ".relaPResetPRG"
-				next if section_name == ".relaFIXEDVECT"
-
-				puts "#{section_name}, #{section[:bin]}"
 				cur_pos += write_section_header(link_f, section[:section_info])
 			end
 			link_f.close
