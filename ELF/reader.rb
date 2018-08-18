@@ -139,6 +139,29 @@ module ELF
 			section_data = @bin[offset, size]
 		end
 
+		# ==========================================================================
+		# delete Symbol from symbol table
+		# ==========================================================================
+		def delete_section_info name
+			idx = @section_h_map[name][:idx]
+			puts "del:#{idx}, name:#{name}"
+			@section_h_map.delete(name)
+			@section_h_map.each do |name , section_info|
+				# セクションのインデックスを更新
+				if idx < section_info[:idx]
+					tmp_idx = section_info[:idx]
+					section_info[:idx] -= 1
+					symbol_table.each do |symbol_info|
+						# シンボルテーブルのインデックスも合わせて更新
+						symbol_info[:st_shidx] -= 1 if symbol_info[:st_shidx] == tmp_idx
+					end
+				end
+
+				# 参照セクション情報を更新
+				section_info[:related_section_idx] -= 1 if idx < section_info[:related_section_idx]
+			end
+		end
+
 	private
 
 		# ============================================================================
@@ -411,6 +434,12 @@ module ELF
 				section_info[:idx] = idx
 				name_pos = section_info[:name_idx]
 				len = names_section.length - name_pos
+
+				if names_section.empty?
+					# 空文字のセクション対応
+					section_name = ""
+				end
+
 				# get section name from '.shstrtab' section
 				section_name = names_section[name_pos, len].c_str
 				section_info[:name] = section_name
@@ -423,7 +452,7 @@ module ELF
 			end
 
 			# DEBUG
-			#show_sections_info(@section_h_map.values)
+			show_sections_info(@section_h_map.values)
 
 			# get .strtab section
 			# until set @strtab_section, can't use get_strtab_string.
@@ -444,7 +473,7 @@ module ELF
 				# Elf32_Rela has `r_addend`, besides Elf32_Rel.
 				unless section_name.match(/.rela/).nil?
 					@rel_sections[section_name] = get_rel_section(@section_h_map[section_name], @symbol_table, true)
-					show_rel_section(section_name, @rel_sections[section_name])
+					#show_rel_section(section_name, @rel_sections[section_name])
 					next
 				end
 

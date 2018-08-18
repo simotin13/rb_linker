@@ -51,14 +51,15 @@ module ELF
 			elf_objects.each do |elf_object|
 				tmp_offset = 0
 
-				symbols.concat(elf_object.symbol_table)
 
 				# リンクする必要がないセクションはここで削除
-				elf_object.section_h_map.delete("$iop")
-				elf_object.section_h_map.delete(".relaPResetPRG")
-				elf_object.section_h_map.delete(".relaFIXEDVECT")
+				elf_object.delete_section_info("$iop")
+				elf_object.delete_section_info(".relaPResetPRG")
+				elf_object.delete_section_info(".relaFIXEDVECT")
+				symbols.concat(elf_object.symbol_table)
 
 				# リロケーションの情報を保持しておく
+				puts "rel_sections:#{elf_object.rel_sections}"
 				rel_secions = elf_object.rel_sections
 
 				# 同一のセクションのデータを配列としてまとめる
@@ -147,14 +148,11 @@ module ELF
 			linked_header.elf_program_h_size = ELF_SIZE_ELF32_PROG_HEADER
 			linked_header.elf_program_h_num = prog_headers.length
 
-			# TODO
-			linked_header.elf_section_name_idx = 0
+			linked_header.elf_section_name_idx = linked_section_map[".shstrtab"][:section_info][:idx]
 
 			# ========================================================================
 			# リロケーションの更新
 			# ========================================================================
-			reset_section = linked_section_map[".relaPResetPRG"]
-			fixvect_section = linked_section_map[".relaFIXEDVECT"]
 			rel_secions.each do |name, rel_section|
 				rel_section.each do |rel_info|
 					sym_info = symbols[rel_info[:symbol_idx]]
@@ -166,6 +164,7 @@ module ELF
 						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
 						ref_addr = ref_section[1][:section_info][:va_address]
 						ref_addr += sym_info[:st_value]
+						puts ref_addr
 						bytes = ref_addr.to_bin32_ary(true)
 						offset = rel_info[:offset]
 						target_section[:bin][offset + 0] = bytes[0]
@@ -200,34 +199,26 @@ module ELF
 			link_f = open(outfilepath, "wb")
 			cur_pos = 0
 
+			# ======================================================
 			# write ELF Header
+			# ======================================================
 			cur_pos += write_elf_header(link_f, elf_objects.first)
 
+			# ======================================================
 			# write Program Headers
+			# ======================================================
 			prog_headers.each do |prog_header|
 				cur_pos += write_prog_header(link_f, prog_header)
 			end
 
+			# ======================================================
 			# write secions
+			# ======================================================
 			linked_section_map.each_pair do |section_name, section|
 				# セクションのオフセット位置更新
 				section[:section_info][:offset] = cur_pos
 				cur_pos += link_f.write(section[:bin].pack("C*"))
 			end
-
-			# write Section Headers
-			empty_section = {}
-			empty_section[:name_idx] = 0
-			empty_section[:type] = 0
-			empty_section[:flags] = 0
-			empty_section[:va_address] = 0
-			empty_section[:offset] = 0
-			empty_section[:size] = 0
-		  empty_section[:related_section_idx] = 0
-			empty_section[:info] = 0
-			empty_section[:addr_align] = 0
-			empty_section[:entry_size] = 0
-			#write_section_header(link_f, empty_section)
 
 			linked_section_map.each_pair do |section_name, section|
 				cur_pos += write_section_header(link_f, section[:section_info])
