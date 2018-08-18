@@ -20,7 +20,8 @@ ARGV.each do |filepath|
   else
     throw "Different Elf Class found!" if elf_class != elf_object.elf_class
   end
-  elf_object.section_h_map.delete_if { |key, val| val[:size] == 0 }
+
+  #elf_object.section_h_map.delete_if { |key, val| val[:size] == 0 }
   elf_ojects << elf_object
 end
 
@@ -29,4 +30,4 @@ linker = ELF::RXLinker.new
 linker.link "sakura2.abs", elf_ojects, "led/sakura2.clnk"
 
 linkedobj = ELF::Reader.new
-#linkedobj.read("rx_linked.o")
+linkedobj.read("sakura2.abs")
