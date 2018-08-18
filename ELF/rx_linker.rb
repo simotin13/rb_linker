@@ -55,8 +55,8 @@ module ELF
 
 				# リンクする必要がないセクションはここで削除
 				elf_object.section_h_map.delete("$iop")
-				#elf_object.section_h_map.delete(".relaPResetPRG")
-				#elf_object.section_h_map.delete(".relaFIXEDVECT")
+				elf_object.section_h_map.delete(".relaPResetPRG")
+				elf_object.section_h_map.delete(".relaFIXEDVECT")
 
 				# リロケーションの情報を保持しておく
 				rel_secions = elf_object.rel_sections
