@@ -59,7 +59,6 @@ module ELF
 				symbols.concat(elf_object.symbol_table)
 
 				# リロケーションの情報を保持しておく
-				puts "rel_sections:#{elf_object.rel_sections}"
 				rel_secions = elf_object.rel_sections
 
 				# 同一のセクションのデータを配列としてまとめる
@@ -164,7 +163,6 @@ module ELF
 						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
 						ref_addr = ref_section[1][:section_info][:va_address]
 						ref_addr += sym_info[:st_value]
-						puts ref_addr
 						bytes = ref_addr.to_bin32_ary(true)
 						offset = rel_info[:offset]
 						target_section[:bin][offset + 0] = bytes[0]

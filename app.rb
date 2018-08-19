@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 $LOAD_PATH.push("./ELF")
 require "elf"
-require "reader"
+require "elf_object"
 require "rx_linker"
 
 if ARGV.length < 1
@@ -13,8 +13,7 @@ elf_ojects = []
 
 elf_class = nil
 ARGV.each do |filepath|
-  elf_object = ELF::Reader.new
-  elf_object.read(filepath)
+  elf_object = ELF::ElfObject.new(filepath)
   if elf_class.nil?
     elf_class = elf_object.elf_class
   else
@@ -28,6 +27,3 @@ end
 # Link Object files.
 linker = ELF::RXLinker.new
 linker.link "sakura2.abs", elf_ojects, "led/sakura2.clnk"
-
-linkedobj = ELF::Reader.new
-linkedobj.read("sakura2.abs")

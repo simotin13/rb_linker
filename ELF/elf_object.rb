@@ -2,17 +2,25 @@ require './monkey_patch'
 require './machine_arch_list'
 
 module ELF
-	class Reader
-		attr_accessor :section_h_map, :ident, :elf_class, :elf_endian, :elf_version, :os_abi,
-							:elf_type, :elf_machine, :elf_version, :elf_entry, :elf_program_h_offset,
-							:elf_section_h_offset, :elf_flags, :elf_h_size, :elf_program_h_size,
-							:elf_program_h_num, :elf_section_h_size, :elf_section_h_num, :elf_section_name_idx,
-							:symbol_table, :rel_sections
+	class ElfObject
+		attr_accessor :section_h_map, :ident, :elf_class, :elf_endian, :elf_version,
+									:os_abi, :elf_type, :elf_machine, :elf_version, :elf_entry,
+									:elf_program_h_offset, :elf_section_h_offset, :elf_flags,
+									:elf_h_size, :elf_program_h_size, :elf_program_h_num,
+									:elf_section_h_size, :elf_section_h_num,
+									:elf_section_name_idx, :symbol_table, :rel_sections
 
-		# ============================================================================
+		# ==========================================================================
+		# constructor
+		# ==========================================================================
+		def initialize filepath
+			read(filepath)
+		end
+
+		# ==========================================================================
 		# Load Object File
 		# - Check if valid ELF and set elf infos.
-		# ============================================================================
+		# ==========================================================================
 		def read filepath
 			bin = File.binread(filepath).unpack("C*")
 			elf_ident = bin[0, ELF_IDENT_SIZE]
@@ -144,7 +152,6 @@ module ELF
 		# ==========================================================================
 		def delete_section_info name
 			idx = @section_h_map[name][:idx]
-			puts "del:#{idx}, name:#{name}"
 			@section_h_map.delete(name)
 			@section_h_map.each do |name , section_info|
 				# セクションのインデックスを更新
@@ -452,7 +459,7 @@ module ELF
 			end
 
 			# DEBUG
-			show_sections_info(@section_h_map.values)
+			#show_sections_info(@section_h_map.values)
 
 			# get .strtab section
 			# until set @strtab_section, can't use get_strtab_string.
