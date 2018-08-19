@@ -14,19 +14,23 @@ class Integer
   	end
   end
 
-	def to_bin8
-		ary = []
+  def to_bin8_ary
+    ary = []
 		if self < 0xFF
 			ary.push(0x00)
 			ary.push(self)
 		else
 			throw "Unexpected Integer value #{self}"
 		end
+    ary
+  end
+	def to_bin8
+    ary = to_bin8_ary
 		ary.pack("C*")
 	end
 
-	def to_bin16(is_little=true)
-		ary = []
+  def to_bin16_ary(is_little=true)
+    ary = []
 		if self < 0xFF
 			ary.push(0x00)
 			ary.push(self)
@@ -39,11 +43,16 @@ class Integer
 			throw "Unexpected Integer value #{self}"
 		end
 		ary.reverse! if is_little
+    ary
+  end
+
+	def to_bin16(is_little=true)
+    ary = to_bin16_ary(is_little)
 		ary.pack("C*")
 	end
 
-	def to_bin32(is_little = true)
-		ary = []
+  def to_bin32_ary(is_little=true)
+    ary = []
 		if self < 0xFF
 			ary.push(0x00)
 			ary.push(0x00)
@@ -72,11 +81,16 @@ class Integer
 			throw "Unexpected Integer value #{self}"
 		end
 		ary.reverse! if is_little
+    ary
+  end
+
+	def to_bin32(is_little = true)
+    ary = to_bin32_ary(is_little)
 		ary.pack("C*")
 	end
 
-	def to_bin64(is_little=true)
-		ary = []
+  def to_bin64_ary(is_little = true)
+    ary = []
 		if self < 0xFF
 			ary.push(0x00)
 			ary.push(0x00)
@@ -142,6 +156,11 @@ class Integer
 			throw "Unexpected Integer value #{self}"
 		end
 		ary.reverse! if is_little
+    ary
+  end
+
+	def to_bin64(is_little=true)
+    ary = to_bin64_ary(is_little)
 		ary.pack("C*")
 	end
 
