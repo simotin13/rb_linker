@@ -32,12 +32,19 @@ module ELF
 			link_opt.each_line do |line|
 				if line.include?("-start")
 					secton_addrs = line.split("=")[1].split(",")
+					secton_addrs.reverse!
+					base_addr = nil
 					secton_addrs.each do |secton_addr|
 						tmp = secton_addr.split("/")
-						link_addr_maps[tmp[0]] = tmp[1]
+						base_addr = tmp[1] unless tmp[1].nil?
+						name = tmp[0]
+						addr = base_addr
+						link_addr_maps[name] = addr
 					end
 				end
   		end
+
+			puts link_addr_maps
 
 			linked_section_map = {}
 
