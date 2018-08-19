@@ -3,7 +3,11 @@
 -nodebug
 -output=DefaultBuild\sakura2.abs
 -nooptimize
--start=PResetPRG/0FFF00000,FIXEDVECT/FFFFFFFC
+-start=SU,SI/00000000,PResetPRG/0FFF00000,FIXEDVECT/FFFFFFFC
 -nologo
+-end
+-input=DefaultBuild\sakura2.abs
+-output=DefaultBuild\sakura2.mot
+-form=stype
 -exit
 
