@@ -26,4 +26,4 @@ end
 
 # Link Object files.
 linker = ELF::RXLinker.new
-linker.link "sakura2.abs", elf_ojects, "led/sakura2.clnk"
+linker.link "sakura2.abs", elf_ojects, "test/led/sakura2.clnk"
