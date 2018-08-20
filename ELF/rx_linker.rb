@@ -12,7 +12,14 @@ module ELF
 	#	".strtab",						# 文字列テーブル
 	#	".shstrtab"						# セクション文字列
 	# ============================================================================
+
 	class RXLinker < Linker
+		R_RX_DIR32				= 0x01
+		R_RX_DIR8S_PCREL	= 0x0B
+		R_RX_ABS32				= 0x41
+		R_RX_OPadd				= 0x82
+		R_RX_OPsctsize		= 0x88
+		R_RX_OPscttop  		= 0x8D
 
 	  def check_elf_header elf_objects
 	    # check ELF Header of each objects
@@ -25,11 +32,13 @@ module ELF
 			link_opt = ""
 			open(link_script, "r") do |linkscript_f|
 				link_opt = linkscript_f.read
+				link_opt
 			end
 
 			# リンカスクリプトからセクションの割り当てアドレスを取得する
 			link_addr_maps = {}
 			link_opt.each_line do |line|
+				line.chomp!
 				if line.include?("-start")
 					secton_addrs = line.split("=")[1].split(",")
 					secton_addrs.reverse!
@@ -39,7 +48,8 @@ module ELF
 						base_addr = tmp[1] unless tmp[1].nil?
 						name = tmp[0]
 						addr = base_addr
-						link_addr_maps[name] = addr
+						link_addr_maps[base_addr] = [] if link_addr_maps[base_addr].nil?
+						link_addr_maps[base_addr] << name
 					end
 				end
   		end
@@ -100,44 +110,57 @@ module ELF
 			end
 
 			# ========================================================================
+			# セクションのアドレス・サイズ情報を更新
+			# ========================================================================
+			link_addr_maps.each do |section_addr, section_names|
+				section_names.each do |section_name|
+					puts "TODO ここでVAアドレスの値を計算する"
+					puts "セクションのアドレス+サイズ=グループの次のセクション"
+				end
+			end
+
+
+			# ========================================================================
 			# プログラムヘッダの作成
 			# ========================================================================
 			prog_headers = []
-			link_addr_maps.each do |section_name, section_addr|
-				section_info = linked_section_map[section_name][:section_info]
-				program_h_info = {}
-				# LOAD固定
-				program_h_info[:p_type]   = ELF_PT_LOAD
+			link_addr_maps.each do |section_addr, section_names|
+				section_names.each do |section_name|
+					section_info = linked_section_map[section_name][:section_info]
+					program_h_info = {}
+					# LOAD固定
+					program_h_info[:p_type]   = ELF_PT_LOAD
 
-				# セクションオフセット位置
-				prog_offset =
-				  ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_addr_maps.length)
-				linked_section_map.each_pair do |name, section|
-					break if section_name == name
-					prog_offset += section[:bin].size
+					# セクションオフセット位置
+					prog_offset =
+					  ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_addr_maps.length)
+					linked_section_map.each_pair do |name, section|
+						break if section_name == name
+						prog_offset += section[:bin].size
+					end
+					program_h_info[:p_offset] = prog_offset
+
+					# とりあえずROM/RAM展開はなし
+					program_h_info[:p_vaddr]  = section_addr.to_i(16)
+					program_h_info[:p_paddr]  = section_addr.to_i(16)
+
+					# セクション情報をVirtualAddrssで更新
+					section_info[:va_address] = section_addr.to_i(16)
+
+					program_h_info[:p_filesz] = section_info[:size]
+					program_h_info[:p_memsz]  = section_info[:size]
+
+					# セグメントの属性を設定
+					flg_val = ELF_PF_R
+					flag = section_info[:flags]
+					if (flag & ELF_FLG_EXECUTE) != 0
+						flg_val += ELF_PF_X
+					end
+
+					program_h_info[:p_flags]  = flg_val
+					program_h_info[:p_align]  = section_info[:addr_align]
+					prog_headers << program_h_info
 				end
-				program_h_info[:p_offset] = prog_offset
-
-				# とりあえずROM/RAM展開はなし
-				program_h_info[:p_vaddr]  = section_addr.to_i(16)
-				program_h_info[:p_paddr]  = section_addr.to_i(16)
-
-				# セクション情報をVirtualAddrssで更新
-				section_info[:va_address] = section_addr.to_i(16)
-
-				program_h_info[:p_filesz] = section_info[:size]
-				program_h_info[:p_memsz]  = section_info[:size]
-
-				# セグメントの属性を設定
-				flg_val = ELF_PF_R
-				flag = section_info[:flags]
-				if (flag & ELF_FLG_EXECUTE) != 0
-					flg_val += ELF_PF_X
-				end
-
-				program_h_info[:p_flags]  = flg_val
-				program_h_info[:p_align]  = section_info[:addr_align]
-				prog_headers << program_h_info
 			end
 
 			# ELF header
@@ -159,13 +182,14 @@ module ELF
 			# ========================================================================
 			# リロケーションの更新
 			# ========================================================================
+			rel_calc_stack = []
 			rel_secions.each do |name, rel_section|
 				rel_section.each do |rel_info|
 					sym_info = symbols[rel_info[:symbol_idx]]
 					target_section_name = name.slice(5..-1)
 					target_section = linked_section_map[target_section_name]
 					case rel_info[:type]
-					when 0x01
+					when R_RX_DIR32
 						# 4byte のアドレスを書き換え
 						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
 						ref_addr = ref_section[1][:section_info][:va_address]
@@ -176,11 +200,21 @@ module ELF
 						target_section[:bin][offset + 1] = bytes[1]
 						target_section[:bin][offset + 2] = bytes[2]
 						target_section[:bin][offset + 3] = bytes[3]
-					when 0x0B
+					when R_RX_ABS32
+					when R_RX_OPscttop
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
+						#puts ref_section[1]
+						#[:section_info]
+					when R_RX_OPsctsize
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
+						puts ref_section[1][:section_info][:size]
+						#[:section_info]
+					when R_RX_OPadd
+					when R_RX_DIR8S_PCREL
 						rel_addr = rel_info[:r_addend] - rel_info[:offset] + 1
 						target_section[:bin][rel_info[:offset]] = rel_addr
 					else
-						throw "Unexpected rel type, #{rel_info[:type]}"
+						throw "Unexpected rel type, #{rel_info[:type].to_h}"
 					end
 				end
 			end
