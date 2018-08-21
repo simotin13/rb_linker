@@ -141,9 +141,7 @@ module ELF
 					prog_offset = 0
 					prog_offset = ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_addr_sections_num)
 
-					# ====================================================================
 					# セクションのオフセット位置を計算
-					# ====================================================================
 					linked_section_map.each_pair do |name, section|
 						break if section_name == name
 						prog_offset += section[:bin].size
@@ -155,11 +153,12 @@ module ELF
 					program_h_info[:p_offset] = prog_offset
 
 					# とりあえずROM/RAM展開はなし
-					program_h_info[:p_vaddr]  = section_addr
-					program_h_info[:p_paddr]  = section_addr
+					program_h_info[:p_vaddr]  = section_info[:va_address]
+					program_h_info[:p_paddr]  = section_info[:offset]
 
+					# TODO 計算済み?
 					# セクション情報をVirtualAddrssで更新
-					section_info[:va_address] = section_addr
+					#section_info[:va_address] = section_addr
 
 					program_h_info[:p_filesz] = section_info[:size]
 					program_h_info[:p_memsz]  = section_info[:size]
@@ -235,7 +234,8 @@ module ELF
 					when R_RX_OPadd
 						arg1 = rel_calc_stack.pop
 						arg2 = rel_calc_stack.pop
-						rel_calc_stack << (arg1 + arg2)
+						val = arg1 + arg2
+						rel_calc_stack << val
 					when R_RX_DIR8S_PCREL
 						rel_addr = rel_info[:r_addend] - rel_info[:offset] + 1
 						target_section[:bin][rel_info[:offset]] = rel_addr
