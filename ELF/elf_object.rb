@@ -142,6 +142,9 @@ module ELF
 		def get_section_data section_name
 			return nil unless @section_h_map.has_key?(section_name)
 
+			# ファイル中に実体を持たないセクション
+			return nil if @section_h_map[section_name][:type] == SH_TYPE_NOBITS
+
 			offset = @section_h_map[section_name][:offset]
 			size = @section_h_map[section_name][:size]
 			section_data = @bin[offset, size]
@@ -550,19 +553,19 @@ module ELF
 				flg_str = flg_str.ljust(3)
 
 				case section_info[:type]
-				when 0
+				when SH_TYPE_NULL
 					type_str = "NULL"
-				when 1
+				when SH_TYPE_PROGBITS
 					type_str = "PROGBITS"
-				when 2
+				when SH_TYPE_SYMTAB
 					type_str = "SYMTAB"
-				when 3
+				when SH_TYPE_STRTAB
 					type_str = "STRTAB"
-				when 4
+				when SH_TYPE_UNDEF
 					type_str = "*UNDEF*"
-				when 8
+				when SH_TYPE_NOBITS
 					type_str = "NOBITS"
-				when 9
+				when SH_TYPE_REL
 					type_str = "REL"
 				else
 					type_str = "UnKnown"

@@ -37,39 +37,43 @@ module ELF
 
 			# リンカスクリプトからセクションの割り当てアドレスを取得する
 			link_addr_maps = {}
+			link_addr_sections_num = 0
 			link_opt.each_line do |line|
 				line.chomp!
 				if line.include?("-start")
-					secton_addrs = line.split("=")[1].split(",")
-					secton_addrs.reverse!
-					base_addr = nil
-					secton_addrs.each do |secton_addr|
-						tmp = secton_addr.split("/")
-						base_addr = tmp[1] unless tmp[1].nil?
-						name = tmp[0]
-						addr = base_addr
-						link_addr_maps[base_addr] = [] if link_addr_maps[base_addr].nil?
-						link_addr_maps[base_addr] << name
+					ary = line.split("=")[1].split(",")
+					group_sections = []
+					ary.each do |elm|
+						tmp = elm.split("/")
+						if 1 == tmp.size
+							group_sections.concat(tmp)
+						else
+							base_addr = tmp.pop.to_i(16)
+							group_sections.concat(tmp)
+							link_addr_maps[base_addr] = group_sections
+							link_addr_sections_num += group_sections.length
+
+							# アドレス毎のセクション情報を初期化
+							group_sections = []
+						end
 					end
 				end
   		end
 
-			puts link_addr_maps
-
 			linked_section_map = {}
-
 			linked_offset = 0
 			symbols = []
 
-			# ======================================================
+			# ========================================================================
 			# 各オブジェクトファイル毎にリンク処理を行う
-			# ======================================================
+			# ========================================================================
 			rel_secions = {}
 			elf_objects.each do |elf_object|
 				tmp_offset = 0
 
-
+				# ======================================================================
 				# リンクする必要がないセクションはここで削除
+				# ======================================================================
 				elf_object.delete_section_info("$iop")
 				elf_object.delete_section_info(".relaPResetPRG")
 				elf_object.delete_section_info(".relaFIXEDVECT")
@@ -82,7 +86,9 @@ module ELF
 				elf_object.section_h_map.each_pair do |section_name, section_info|
 
 					# セクションサイズ分オフセットを更新
-					tmp_offset += section_info[:size]
+					unless section_info[:type] == SH_TYPE_NOBITS
+						tmp_offset += section_info[:size]
+					end
 
 					# セクション情報の初期化
  					if linked_section_map[section_name].nil?
@@ -95,7 +101,7 @@ module ELF
 					# セクションデータ取得し結合する
 					secion_bin = elf_object.get_section_data(section_name)
 					if secion_bin.nil?
-						puts "#{section_name} is nil...."
+						puts "#{section_name} is nil."
 						next
 					end
 
@@ -113,12 +119,12 @@ module ELF
 			# セクションのアドレス・サイズ情報を更新
 			# ========================================================================
 			link_addr_maps.each do |section_addr, section_names|
+				va_addr_end = section_addr
 				section_names.each do |section_name|
-					puts "TODO ここでVAアドレスの値を計算する"
-					puts "セクションのアドレス+サイズ=グループの次のセクション"
+					linked_section_map[section_name][:section_info][:va_address] = va_addr_end
+					va_addr_end += linked_section_map[section_name][:section_info][:size]
 				end
 			end
-
 
 			# ========================================================================
 			# プログラムヘッダの作成
@@ -132,20 +138,28 @@ module ELF
 					program_h_info[:p_type]   = ELF_PT_LOAD
 
 					# セクションオフセット位置
-					prog_offset =
-					  ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_addr_maps.length)
+					prog_offset = 0
+					prog_offset = ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_addr_sections_num)
+
+					# ====================================================================
+					# セクションのオフセット位置を計算
+					# ====================================================================
 					linked_section_map.each_pair do |name, section|
 						break if section_name == name
 						prog_offset += section[:bin].size
 					end
+
+					if section_info[:type] == SH_TYPE_NOBITS
+						prog_offset = 0
+					end
 					program_h_info[:p_offset] = prog_offset
 
 					# とりあえずROM/RAM展開はなし
-					program_h_info[:p_vaddr]  = section_addr.to_i(16)
-					program_h_info[:p_paddr]  = section_addr.to_i(16)
+					program_h_info[:p_vaddr]  = section_addr
+					program_h_info[:p_paddr]  = section_addr
 
 					# セクション情報をVirtualAddrssで更新
-					section_info[:va_address] = section_addr.to_i(16)
+					section_info[:va_address] = section_addr
 
 					program_h_info[:p_filesz] = section_info[:size]
 					program_h_info[:p_memsz]  = section_info[:size]
@@ -155,6 +169,9 @@ module ELF
 					flag = section_info[:flags]
 					if (flag & ELF_FLG_EXECUTE) != 0
 						flg_val += ELF_PF_X
+					end
+					if (flag & ELF_FLG_WRITE) != 0
+						flg_val += ELF_PF_W
 					end
 
 					program_h_info[:p_flags]  = flg_val
@@ -188,6 +205,7 @@ module ELF
 					sym_info = symbols[rel_info[:symbol_idx]]
 					target_section_name = name.slice(5..-1)
 					target_section = linked_section_map[target_section_name]
+
 					case rel_info[:type]
 					when R_RX_DIR32
 						# 4byte のアドレスを書き換え
@@ -201,15 +219,23 @@ module ELF
 						target_section[:bin][offset + 2] = bytes[2]
 						target_section[:bin][offset + 3] = bytes[3]
 					when R_RX_ABS32
+						val = rel_calc_stack.pop
+						bytes = val.to_bin32_ary(true)
+						offset = rel_info[:offset]
+						target_section[:bin][offset + 0] = bytes[0]
+						target_section[:bin][offset + 1] = bytes[1]
+						target_section[:bin][offset + 2] = bytes[2]
+						target_section[:bin][offset + 3] = bytes[3]
 					when R_RX_OPscttop
 						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
-						#puts ref_section[1]
-						#[:section_info]
+						rel_calc_stack << ref_section[1][:section_info][:va_address]
 					when R_RX_OPsctsize
 						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
-						puts ref_section[1][:section_info][:size]
-						#[:section_info]
+						rel_calc_stack << ref_section[1][:section_info][:size]
 					when R_RX_OPadd
+						arg1 = rel_calc_stack.pop
+						arg2 = rel_calc_stack.pop
+						rel_calc_stack << (arg1 + arg2)
 					when R_RX_DIR8S_PCREL
 						rel_addr = rel_info[:r_addend] - rel_info[:offset] + 1
 						target_section[:bin][rel_info[:offset]] = rel_addr
@@ -225,6 +251,11 @@ module ELF
 			sections_size  = 0
 			sections_count = 0
 			linked_section_map.each_pair do |section_name, section|
+				if section[:section_info][:type] == SH_TYPE_NOBITS
+					# 実体のないセクションはセクションヘッダのみ書き込みを行う
+					sections_count += 1
+					next
+				end
 				unless section[:bin].nil?
 					sections_size += section[:bin].size
 					sections_count += 1
@@ -254,6 +285,9 @@ module ELF
 			# write secions
 			# ======================================================
 			linked_section_map.each_pair do |section_name, section|
+				# 実体のないセクションは書き込み不要
+				next if section[:section_info][:type] == SH_TYPE_NOBITS
+
 				# セクションのオフセット位置更新
 				section[:section_info][:offset] = cur_pos
 				cur_pos += link_f.write(section[:bin].pack("C*"))
