@@ -26,13 +26,49 @@ module ELF
 	    true
 	  end
 
-	  def link outfilepath, elf_objects, link_script
+		# .clnkファイルによるリンク
+		def link clnk_file
+			link_opt = ""
+			open(link_script, "r") do |linkscript_f|
+				link_opt = linkscript_f.read
+			end
+
+
+			link_opt.each_line do |line|
+				line.chomp!
+				input_files = []
+				output_file = ""
+				if line.include?("-input")
+					input_files << line.split("=")[1]
+				elsif line.include?("-output")
+					output_file = line.split("=")[1]
+				elsif line.include?("-start")
+					ary = line.split("=")[1].split(",")
+					group_sections = []
+					ary.each do |elm|
+						tmp = elm.split("/")
+						if 1 == tmp.size
+							group_sections.concat(tmp)
+						else
+							base_addr = tmp.pop.to_i(16)
+							group_sections.concat(tmp)
+							link_addr_maps[base_addr] = group_sections
+							link_addr_sections_num += group_sections.length
+
+							# アドレス毎のセクション情報を初期化
+							group_sections = []
+						end
+					end
+				end
+  		end
+		end
+
+	  def link outfilepath, elf_objects, clnk_file
 	    check_elf_header(elf_objects)
 
 			link_opt = ""
 			open(link_script, "r") do |linkscript_f|
 				link_opt = linkscript_f.read
-				link_opt
 			end
 
 			# リンカスクリプトからセクションの割り当てアドレスを取得する
