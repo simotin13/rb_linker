@@ -126,7 +126,6 @@ module ELF
 				end
 			end
 
-=begin
 			# ========================================================================
 			# セクションのソート
 			# オフセットを基準にセクション情報をソートする
@@ -140,7 +139,6 @@ module ELF
 				linked_section_map[section_info[0]][:section_info][:idx] = idx
 			end
 			linked_section_map[".shstrtab"][:section_info][:idx]
-=end
 
 			# ========================================================================
 			# プログラムヘッダの作成
