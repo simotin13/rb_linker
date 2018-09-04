@@ -7,10 +7,10 @@
 #pragma stacksize su=0x100
 #pragma stacksize si=0x300
 
+void main(void);
+
 void PowerON_Reset_PC(void) {
-    volatile int i;
-    volatile unsigned char reg; 
-    PORTA.PDR.BIT.B0 = 1;
+    #if 0
     while(1){
         if (i % 1000 == 0) {
             reg  = PORTA.PODR.BIT.B0;
@@ -19,6 +19,8 @@ void PowerON_Reset_PC(void) {
         }
         i++;
     }
+    #endif
+    main();
 }
 
 #pragma section C FIXEDVECT

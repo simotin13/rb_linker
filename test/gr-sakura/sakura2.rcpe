@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <MicomToolCommonProjectFile Version="1.00">
-  <CreatorType Name="CubeSuite+" Version="V5.00.00  [05 Dec 2016]" />
+  <CreatorType Name="CubeSuite+" Version="V6.01.00  [01 Dec 2017]" />
   <Placeholders>
     <PlaceholderPrefix>%</PlaceholderPrefix>
     <PlaceholderPostfix>%</PlaceholderPostfix>
@@ -8,9 +8,10 @@
   <Project Name="sakura2" Type="Application">
     <Files>
       <Path>resetprg.c</Path>
+      <Path>main.c</Path>
     </Files>
     <Device Series="RX">R5F563NYDxFP</Device>
-    <BuildOptions Name="CC-RX" Version="V2.06.00">
+    <BuildOptions Name="CC-RX" Version="V2.08.00">
       <BuildMode Name="DefaultBuild" Active="True">
         <GeneralOptions>
           <SimultaneouslyBuild>true</SimultaneouslyBuild>
@@ -32,7 +33,7 @@
           <Option>-nodebug</Option>
           <Option>-output=%BuildModeName%\%ProjectName%.abs</Option>
           <Option>-nooptimize</Option>
-          <Option>-start=PResetPRG/0FFF00000,FIXEDVECT/FFFFFFFC</Option>
+          <Option>-start=SU,SI/00000000,PResetPRG/0FFF00000,FIXEDVECT/FFFFFFFC</Option>
           <Option>-nologo</Option>
           <Option>-end</Option>
           <Option>-input=%BuildModeName%\%ProjectName%.abs</Option>
@@ -46,6 +47,7 @@
         </LibraryGenerateOptions>
         <LinkOrder>
           <Path>DefaultBuild\resetprg.obj</Path>
+          <Path>DefaultBuild\main.obj</Path>
         </LinkOrder>
         <CommonOptions />
       </BuildMode>
