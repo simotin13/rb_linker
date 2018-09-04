@@ -126,6 +126,22 @@ module ELF
 				end
 			end
 
+=begin
+			# ========================================================================
+			# セクションのソート
+			# オフセットを基準にセクション情報をソートする
+			# ソートする際には、各セクションを参照する値も同時に更新する必要がある
+			# ========================================================================
+			sorted_sections = linked_section_map.sort {|(key1, val1), (key2, val2)| val1[:section_info][:offset] <=> val2[:section_info][:offset] }
+			linked_section_map = {}
+			sorted_sections.each_with_index do |section_info, idx|
+				linked_section_map[section_info[0]] = section_info[1]
+				# インデックス情報を更新
+				linked_section_map[section_info[0]][:section_info][:idx] = idx
+			end
+			linked_section_map[".shstrtab"][:section_info][:idx]
+=end
+
 			# ========================================================================
 			# プログラムヘッダの作成
 			# ========================================================================
@@ -293,6 +309,9 @@ module ELF
 				cur_pos += link_f.write(section[:bin].pack("C*"))
 			end
 
+			# ======================================================
+			# write section headers
+			# ======================================================
 			linked_section_map.each_pair do |section_name, section|
 				cur_pos += write_section_header(link_f, section[:section_info])
 			end
