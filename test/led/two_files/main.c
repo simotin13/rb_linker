@@ -1,4 +1,5 @@
 #include "iodefine.h"
+#pragma section ResetPRG
 
 void main(void)
 {
