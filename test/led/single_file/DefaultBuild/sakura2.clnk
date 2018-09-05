@@ -1,0 +1,9 @@
+-input=DefaultBuild\resetprg.obj
+-noprelink
+-nodebug
+-output=DefaultBuild\sakura2.abs
+-nooptimize
+-start=PResetPRG/0FFF00000,FIXEDVECT/FFFFFFFC
+-nologo
+-exit
+
