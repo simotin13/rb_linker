@@ -10,4 +10,4 @@ if ARGV.length < 1
 end
 
 linker = ELF::RXLinker.new
-linker.link "test/led/sakura2.clnk"
+linker.link ARGV[0]
