@@ -151,7 +151,7 @@ module ELF
 		end
 
 		def has_section?(name)
-			return unless @section_h_map[name].nil?
+			 !@section_h_map[name].nil?
 		end
 
 		# ==========================================================================
