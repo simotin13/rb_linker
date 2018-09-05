@@ -179,7 +179,6 @@ module ELF
 				# インデックス情報を更新
 				linked_section_map[section_info[0]][:section_info][:idx] = idx
 			end
-			linked_section_map[".shstrtab"][:section_info][:idx]
 
 			# ========================================================================
 			# プログラムヘッダの作成
