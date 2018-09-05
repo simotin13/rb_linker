@@ -150,10 +150,15 @@ module ELF
 			section_data = @bin[offset, size]
 		end
 
+		def has_section?(name)
+			return unless @section_h_map[name].nil?
+		end
+
 		# ==========================================================================
 		# delete Symbol from symbol table
 		# ==========================================================================
 		def delete_section_info name
+			return if @section_h_map[name].nil?
 			idx = @section_h_map[name][:idx]
 			@section_h_map.delete(name)
 			@section_h_map.each do |name , section_info|
