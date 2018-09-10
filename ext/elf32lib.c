@@ -9,7 +9,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static uint8_t *getStrTab(uint8_t *pAddr, size_t *pSize)
+#define PAGE_SIZE (1024 *4)
+
+static uint8_t *elf32_getStrTab(uint8_t *pAddr, size_t *pSize)
 {
 	Elf32_Ehdr *pEhdr;
 	Elf32_Shdr *pShdr;
@@ -22,43 +24,41 @@ static uint8_t *getStrTab(uint8_t *pAddr, size_t *pSize)
 	return (uint8_t *)(pAddr + pStrSh->sh_offset);
 }
 
-static int getSectionNameOffset(uint8_t *pAddr, const char *name, size_t *pOffset)
+static int elf32_getSectionNameOffset(uint8_t *pAddr, const char *name, size_t *pOffset)
 {
 	size_t size;
 	size_t sLen;
-	uint8_t *pPos;
+	uint8_t *pStr;
 	size_t offset;
 	offset = 0;
 	fprintf( stderr, "%s %d %s %s\n", __FILE__, __LINE__, __FUNCTION__, "In..." );
 
-	pPos = getStrTab(pAddr, &size);
+	pStr = elf32_getStrTab(pAddr, &size);
 	printf("size:%d\n", size);
 	while(0 < size) {
-		sLen = strlen(pPos);
-		printf("%s, %d\n", pPos, sLen);
-		if (strcmp(name, pPos) == 0) {
+		sLen = strlen((const char *)pStr);
+		printf("%s, %d\n", pStr, sLen);
+		if (strcmp(name, (const char *)pStr) == 0) {
 			*pOffset = offset;
 			return 0;
 		}
 
 		size -= (sLen + 1);
-		pPos += (sLen + 1);
+		pStr += (sLen + 1);
 		offset += (sLen + 1);
 	}
 	return -1;
 }
 
-
-int search_Shdr(uint8_t *pAddr, char *name, Elf32_Shdr **pShdr, uint32_t *pIdx)
+int elf32_searchShdr(uint8_t *pAddr, char *name, Elf32_Shdr **pShdr, uint32_t *pIdx)
 {
 	int ret;
 	int i;
 	Elf32_Ehdr *pEhdr;
-	Elf32_Shdr *pTmpShdr;
 	size_t offset;
 	pEhdr = (Elf32_Ehdr *)pAddr;
 
-	ret = getSectionNameOffset(pAddr, ".symtab", &offset);
+	ret = elf32_getSectionNameOffset(pAddr, ".symtab", &offset);
 	if (ret < 0)
 	{
 		printf(".symtab not found\n");
@@ -78,54 +78,45 @@ int search_Shdr(uint8_t *pAddr, char *name, Elf32_Shdr **pShdr, uint32_t *pIdx)
 	return -1;
 }
 
-
-void getNames(uint8_t *pAddr)
-{
-}
-
-Elf32_Sym *getSymTbl(Elf32_Ehdr *pEhdr)
-{
-}
-
-void show_Elf32_Ehdr(Elf32_Ehdr *pEhdr)
+void elf32_showEhdr(Elf32_Ehdr *pEhdr)
 {
 	fprintf(stdout, "Magic Number:[%02X][%c][%c][%c]\n", pEhdr->e_ident[0], pEhdr->e_ident[1], pEhdr->e_ident[2], pEhdr->e_ident[3]);
 	fprintf(stdout, "Entry Address:%X\n", pEhdr->e_entry);
 	return;
 }
 
-void show_Elf32_Shdr(Elf32_Shdr *pEhdr)
+void elf32_showShdr(Elf32_Shdr *pEhdr)
 {
 	return;
 }
 
-void show_Elf32_Sym(Elf32_Sym *pSym)
+void elf32_showSym(Elf32_Sym *pSym)
 {
 	return;
 }
-void show_Elf32_Phdr(Elf32_Phdr *pPhdr)
+void elf32_showPhdr(Elf32_Phdr *pPhdr)
 {
 	return;
 }
-void show_Elf32_Rel(Elf32_Rel *pRel)
+void elf32_showRel(Elf32_Rel *pRel)
 {
 	return;
 }
-void show_Elf32_Rela(Elf32_Rela *pRela;)
+void elf32_showRela(Elf32_Rela *pRela;)
 {
 	return;
 }
 
-int munmap_file(void *pAddr, size_t length)
+int elf32_munmapFile(void *pAddr, size_t length)
 {
 	return munmap(pAddr, length);
 }
 
-int mmap_file(char *filepath, int prot, int flags, int offset, void** pAddr)
+int elf32_mmapFile(char *filepath, int prot, int flags, int offset, void** pAddr, size_t *pLength)
 {
 	struct stat r_stat;
 	int fd;
-	uint8_t *pMapAddr;
+	size_t map_size = 0;
 
 	fd = open(filepath, O_RDONLY);
 	if (fd < 0) {
@@ -134,12 +125,30 @@ int mmap_file(char *filepath, int prot, int flags, int offset, void** pAddr)
 	}
 
 	fstat(fd, &r_stat);
-	*pAddr = mmap(NULL, r_stat.st_size, prot, flags, fd, offset);
+
+	map_size = r_stat.st_size + PAGE_SIZE;
+	*pAddr = mmap(NULL, map_size, prot, flags, fd, offset);
 	if (*pAddr == MAP_FAILED) {
 		fprintf(stderr, "mmap %s failed\n", filepath);
 		return -1;
 	}
 
+	*pLength = map_size;
+
 	close(fd);
+	return 0;
+}
+
+int elf32_mremap(void *pOldAddr, size_t oldSize, size_t newSize, int flags, size_t *pLength)
+{
+	// TODO
+	#if 0
+	uint8_t *pMapAddr;
+	pMapAddr = mremap(pOldAddr, oldSize, newSize, flags);
+	if (*pMapAddr == MAP_FAILED) {
+		fprintf(stderr, "mremap failed\n");
+		return -1;
+	}
+	#endif
 	return 0;
 }

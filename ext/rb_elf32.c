@@ -25,7 +25,7 @@ static void rb_elf32_free(void *pObj)
 	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	
 	ST_ELF32 *pElf32 = (ST_ELF32 *)pObj;
-    munmap_file(pElf32, pElf32->length);
+    elf32_munmapFile(pElf32, pElf32->length);
 	free(pElf32);
 	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return;
@@ -62,7 +62,7 @@ static VALUE elf32_initialize(VALUE self, VALUE filepath)
 	Check_Type( filepath, T_STRING );
 
 	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pElf32);
-	ret = mmap_file(StringValuePtr(filepath), PROT_READ, MAP_PRIVATE, 0, (void *)&pElf32->pAddr, &pElf32->length);
+	ret = elf32_mmapFile(StringValuePtr(filepath), PROT_READ, MAP_PRIVATE, 0, (void *)&pElf32->pAddr, &pElf32->length);
 	if (ret < 0) {
 		raise_exception(__FUNCTION__, __LINE__);
 	}
@@ -73,14 +73,17 @@ static VALUE elf32_show_Ehdr(VALUE self)
 {
 	ST_ELF32 *pElf32;
 	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pElf32);
-	show_Elf32_Ehdr( (Elf32_Ehdr *)pElf32->pAddr );
+	elf32_showEhdr( (Elf32_Ehdr *)pElf32->pAddr );
 	return Qnil;
 }
 
 static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 {
+	#if 0
 	ST_ELF32 *pSelf, *pArg;
-	Elf32_Shdr *pSelfShdr, *pArgShdr;
+	Elf32_Shdr *pSelfShdr;
+	Elf32_Shdr *pArgShdr;
+	Elf32_Shdr *pArgStrShdr;	// 結合オブジェクト文字列セクション
 	uint8_t *pSelfSymtab;
 	Elf32_Sym *pArgSymtab;
 	uint32_t idx;
@@ -90,26 +93,32 @@ static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pSelf);
 	TypedData_Get_Struct(arg, ST_ELF32, &rb_elf32_type, pArg);
 
-	ret = search_Shdr(pSelf->pAddr, ".symtab", &pSelfShdr, &idx);
+	ret = elf32_searchShdr(pSelf->pAddr, ".symtab", &pSelfShdr, &idx);
 	pSelfSymtab = (pSelf->pAddr + pSelfShdr->sh_offset);
 	// .symtabの最後へ移動
 	pSelfSymtab += pSelfShdr->sh_size;
 
-	ret = search_Shdr(pArg->pAddr, ".symtab", &pArgShdr, &idx);
+	// 結合するオブジェクトのシンボルテーブル位置へ移動
+	ret = elf32_searchShdr(pArg->pAddr, ".symtab", &pArgShdr, &idx);
 	pArgSymtab = (Elf32_Sym *)(pArg->pAddr + pArgShdr->sh_offset);
 	size = pArgShdr->sh_size;
-	while(0 < size) {
-		memcpy(pSelfSymtab, pArgShdr, sizeof(Elf32_Sym));
-		pSelfSymtab += sizeof(Elf32_Sym);
 
+	// 全てを先に結合してからあとでチェックしてもよい
+	memcpy(pSelfSymtab, pArgShdr, sizeof(Elf32_Sym));
+	pSelfSymtab += sizeof(Elf32_Sym);
+	while(0 < size) {
 		// やること
 		// シンボルに対応する文字列をコピー
 		//   →シンボルのタイプをチェックすること
-		// シンボルが関連するセクションをコピー
-		//   →要検討
-
+		switch(pArgShdr->sh_type) {
+		case fff:
+			ret = elf32_searchShdr(pArg->pAddr, ".symtab", &pArgStrShdr, &idx);
+			break;
+		default:
+			break;
+		}
 	}
-
+	#endif
 
 	return Qnil;
 }
