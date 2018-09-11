@@ -79,7 +79,6 @@ static VALUE elf32_show_Ehdr(VALUE self)
 
 static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 {
-	#if 0
 	ST_ELF32 *pSelf, *pArg;
 	Elf32_Shdr *pSelfShdr;
 	Elf32_Shdr *pArgShdr;
@@ -89,6 +88,13 @@ static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 	uint32_t idx;
 	size_t size;
 	int ret;
+
+	// 実装方針
+	// とりあえずシンボルテーブルを全部くっつける
+	// タイプを気にせず関連する文字列をコピー
+	// →.strtabセクション内でのオフセットは更新する必要がある
+	// →先に.strtabを結合し、オブジェクトのオフセット値を保持しておく
+	// .symtabを最後に結合し、オフセット値を足して文字列位置を補正する
 
 	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pSelf);
 	TypedData_Get_Struct(arg, ST_ELF32, &rb_elf32_type, pArg);
@@ -118,7 +124,6 @@ static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 			break;
 		}
 	}
-	#endif
 
 	return Qnil;
 }
