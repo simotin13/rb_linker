@@ -19,6 +19,7 @@ static uint8_t *elf32_getStrTab(uint8_t *pAddr, size_t *pSize)
 
 	pEhdr = (Elf32_Ehdr *)pAddr;
 	pShdr = (Elf32_Shdr *)(pAddr + pEhdr->e_shoff);
+	printf("pEhdr->e_shstrndx:%d\n", pEhdr->e_shstrndx);
 	pStrSh = &pShdr[pEhdr->e_shstrndx];
 	*pSize = pStrSh->sh_size;
 	return (uint8_t *)(pAddr + pStrSh->sh_offset);
@@ -47,6 +48,7 @@ static int elf32_getSectionNameOffset(uint8_t *pAddr, const char *name, size_t *
 		pStr += (sLen + 1);
 		offset += (sLen + 1);
 	}
+	fprintf( stderr, "%s %d %s %s\n", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return -1;
 }
 
@@ -58,10 +60,11 @@ int elf32_searchShdr(uint8_t *pAddr, char *name, Elf32_Shdr **pShdr, uint32_t *p
 	size_t offset;
 	pEhdr = (Elf32_Ehdr *)pAddr;
 
-	ret = elf32_getSectionNameOffset(pAddr, ".symtab", &offset);
+	fprintf( stderr, "%s %d %s %s\n", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	ret = elf32_getSectionNameOffset(pAddr, name, &offset);
 	if (ret < 0)
 	{
-		printf(".symtab not found\n");
+		printf("%s not found\n", name);
 		return -1;
 	}
 
@@ -81,7 +84,13 @@ int elf32_searchShdr(uint8_t *pAddr, char *name, Elf32_Shdr **pShdr, uint32_t *p
 void elf32_showEhdr(Elf32_Ehdr *pEhdr)
 {
 	fprintf(stdout, "Magic Number:[%02X][%c][%c][%c]\n", pEhdr->e_ident[0], pEhdr->e_ident[1], pEhdr->e_ident[2], pEhdr->e_ident[3]);
+	fprintf(stdout, "e_machine:%d\n", pEhdr->e_machine);
 	fprintf(stdout, "Entry Address:%X\n", pEhdr->e_entry);
+	fprintf(stdout, "e_shoff:%d\n", pEhdr->e_shoff);
+	fprintf(stdout, "e_shentsize:%d\n", pEhdr->e_shentsize);
+	fprintf(stdout, "e_shnum:%d\n", pEhdr->e_shnum);
+	fprintf(stdout, "e_shstrndx:%d\n", pEhdr->e_shstrndx);
+	fprintf(stdout, "%p\n", pEhdr);
 	return;
 }
 
@@ -126,7 +135,8 @@ int elf32_mmapFile(char *filepath, int prot, int flags, int offset, void** pAddr
 
 	fstat(fd, &r_stat);
 
-	map_size = r_stat.st_size + PAGE_SIZE;
+	//map_size = r_stat.st_size + PAGE_SIZE;
+	map_size = r_stat.st_size;
 	*pAddr = mmap(NULL, map_size, prot, flags, fd, offset);
 	if (*pAddr == MAP_FAILED) {
 		fprintf(stderr, "mmap %s failed\n", filepath);

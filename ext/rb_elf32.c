@@ -17,13 +17,88 @@ VALUE rb_cElf32_Sym;
 static VALUE elf32_initialize(VALUE self, VALUE filepath);
 static VALUE elf32_show_Ehdr(VALUE self);
 
-static void raise_exception(const char *fname, int lnum);
-static void dbg_printf(const char *fmt, ...);
+static void raise_exception(const char *fname, int lnum)
+{
+	// TODO error handle
+	rb_exc_raise(rb_str_new2("TODO Exception!!"));
+}
 
+static void dbg_printf(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "[DEBUG] ");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap);
+	return;
+}
+
+// =============================================================================
+// Elf32_Sym
+// =============================================================================
+static void rb_elf32sym_free(void *pObj)
+{
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+
+	Elf32_Sym *pSym = (Elf32_Sym *)pObj;
+	free(pSym);
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	return;
+}
+static size_t rb_elf32sym_size(const void *pObj)
+{
+	return sizeof(Elf32_Sym);
+}
+
+static const rb_data_type_t rb_elf32sym_type = {
+    "ELF/Elf32Sym",
+    {
+		0,							// dmark
+    	rb_elf32sym_free,			// dfree
+    	rb_elf32sym_size,			// dsize
+    	{0},						// reserved
+    },
+    0,								// parent
+	0,								// for user
+	RUBY_TYPED_FREE_IMMEDIATELY,	// free when unused.
+};
+
+static VALUE elf32sym_alloc(VALUE self)
+{
+	Elf32_Shdr *pObj;
+	return TypedData_Make_Struct(self, Elf32_Shdr, &rb_elf32sym_type, pObj);
+}
+
+static VALUE rb_elf32sym_new(void)
+{
+	return elf32sym_alloc(rb_cElf32_Sym);
+}
+
+static VALUE elf32sym_Shm(const Elf32_Sym const *pSym)
+{
+	VALUE obj;
+	Elf32_Shdr *ptr;
+	obj = rb_elf32sym_new();
+	TypedData_Get_Struct(obj, Elf32_Sym, &rb_elf32sym_type, pSym);
+	memcpy(ptr, pSym, sizeof(Elf32_Sym));
+	return obj;
+}
+
+void init_elf32sym(void)
+{
+	rb_cElf32_Sym = rb_define_class_under( rb_elfModule, "Elf32Sym" , rb_cObject );
+    rb_define_alloc_func(rb_cElf32_Sym, elf32sym_alloc);
+	return;
+}
+
+// =============================================================================
+// ELF32 オブジェクト
+// =============================================================================
 static void rb_elf32_free(void *pObj)
 {
 	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
-	
+
 	ST_ELF32 *pElf32 = (ST_ELF32 *)pObj;
     elf32_munmapFile(pElf32, pElf32->length);
 	free(pElf32);
@@ -42,7 +117,7 @@ static const rb_data_type_t rb_elf32_type = {
 		0,							// dmark
     	rb_elf32_free,				// dfree
     	rb_elf32_size,				// dsize
-    	0,							// reserved
+    	{0},						// reserved
     },
     0,								// parent
 	0,								// for user
@@ -77,6 +152,78 @@ static VALUE elf32_show_Ehdr(VALUE self)
 	return Qnil;
 }
 
+// get .symtab list
+static VALUE elf32_get_symtab(VALUE self)
+{
+	int ret;
+	VALUE ary = Qnil;
+	ST_ELF32 *pSelf;
+	Elf32_Shdr *pShdr;
+	uint32_t idx;
+	Elf32_Sym *pSymtab;
+	size_t size;
+	char *pSymtabName;
+
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	#if 0
+	if (!NIL_P(name)) {
+		pSymtabName = ".symtab";
+	} else {
+		pSymtabName = StringValuePtr(name);
+	}
+	#endif
+	pSymtabName = ".symtab";
+
+	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pSelf);
+	ary = rb_ary_new();
+	ret = elf32_searchShdr(pSelf->pAddr, pSymtabName, &pShdr, &idx);
+	if (ret < 0) {
+		// TODO 
+		// Not Found
+		return Qnil;
+	}
+
+	pSymtab = (Elf32_Sym *)(pSelf->pAddr + pShdr->sh_offset);
+	size = pShdr->sh_size;
+	while(0 < size)
+	{
+		rb_ary_push(ary, elf32sym_Shm(pSymtab));
+		pSymtab++;
+		size -= sizeof(Elf32_Sym);
+	}
+
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	return ary;
+}
+
+void Init_elf32( void ) {
+
+	rb_elfModule = rb_define_module( "ELF" );
+	rb_cElf32 = rb_define_class_under( rb_elfModule, "Elf32" , rb_cObject );
+    rb_define_alloc_func(rb_cElf32, elf32_alloc);
+	rb_define_method( rb_cElf32, "initialize", elf32_initialize, 1 );
+	rb_define_method( rb_cElf32, "show_Ehdr", elf32_show_Ehdr, 0 );
+	rb_define_method( rb_cElf32, "symtab", elf32_get_symtab, 0);
+
+	init_elf32sym();
+	return;
+}
+
+
+#if 0
+static VALUE elf32_merge_section(VALUE self, VALUE obj, VALUE name)
+{
+	ST_ELF32 *pSelf, *pArg;
+	Elf32_Shdr *pSelfShdr;
+
+	// self	: 結合先
+	// obj	: 結合したいELFオブジェクト
+	// name	: 結合したいセクション名
+	TypedData_Get_Struct(obj, ST_ELF32, &rb_elf32_type, pArg);
+	ret = elf32_searchShdr(pSelf->pAddr, StringValuePtr(name), &pSelfShdr, &idx);
+	return Qnil;
+}
+
 static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 {
 	ST_ELF32 *pSelf, *pArg;
@@ -95,6 +242,11 @@ static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 	// →.strtabセクション内でのオフセットは更新する必要がある
 	// →先に.strtabを結合し、オブジェクトのオフセット値を保持しておく
 	// .symtabを最後に結合し、オフセット値を足して文字列位置を補正する
+	// シンボルが必要になる理由
+	// リロケーションの時にシンボルテーブルのインデックスで指定されるので
+	// 結合できていないとリロケーションができない
+	// 順番
+	// .strtabのマージ→オブジェクト全体を更新する
 
 	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pSelf);
 	TypedData_Get_Struct(arg, ST_ELF32, &rb_elf32_type, pArg);
@@ -124,33 +276,6 @@ static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 			break;
 		}
 	}
-
 	return Qnil;
 }
-static void raise_exception(const char *fname, int lnum)
-{
-	// TODO error handle
-	rb_exc_raise(rb_str_new2("TODO Exception!!"));
-}
-
-void Init_elf32( void ) {
-
-	rb_elfModule = rb_define_module( "ELF" );
-	rb_cElf32 = rb_define_class_under( rb_elfModule, "Elf32" , rb_cObject );
-    rb_define_alloc_func(rb_cElf32, elf32_alloc);
-	rb_define_method( rb_cElf32, "initialize", elf32_initialize, 1 );
-	rb_define_method( rb_cElf32, "show_Ehdr", elf32_show_Ehdr, 0 );
-	rb_define_method( rb_cElf32, "merge_symbols", elf32_merge_symbols, 1);
-	return;
-}
-
-static void dbg_printf(const char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    fprintf(stderr, "[DEBUG] ");
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
-    va_end(ap);
-	return;
-}
+#endif
