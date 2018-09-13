@@ -66,8 +66,8 @@ static const rb_data_type_t rb_elf32sym_type = {
 
 static VALUE elf32sym_alloc(VALUE self)
 {
-	Elf32_Shdr *pObj;
-	return TypedData_Make_Struct(self, Elf32_Shdr, &rb_elf32sym_type, pObj);
+	Elf32_Sym *pObj;
+	return TypedData_Make_Struct(self, Elf32_Sym, &rb_elf32sym_type, pObj);
 }
 
 static VALUE rb_elf32sym_new(void)
@@ -75,20 +75,44 @@ static VALUE rb_elf32sym_new(void)
 	return elf32sym_alloc(rb_cElf32_Sym);
 }
 
-static VALUE elf32sym_Shm(const Elf32_Sym const *pSym)
+static VALUE elf32sym_Sym(const Elf32_Sym const *pSym)
 {
 	VALUE obj;
-	Elf32_Shdr *ptr;
+	Elf32_Sym *ptr;
 	obj = rb_elf32sym_new();
-	TypedData_Get_Struct(obj, Elf32_Sym, &rb_elf32sym_type, pSym);
+	TypedData_Get_Struct(obj, Elf32_Sym, &rb_elf32sym_type, ptr);
 	memcpy(ptr, pSym, sizeof(Elf32_Sym));
 	return obj;
+}
+static VALUE elf32sym_show_symtab(VALUE self, VALUE ary)
+{
+	int i;
+	int len;
+	Elf32_Sym *pSym;
+	VALUE sh_sym;
+
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	Check_Type( ary, T_ARRAY );
+	len = RARRAY_LEN(ary);
+	for(i = 0; i < len; i++) {
+		sh_sym = rb_ary_entry(ary, i);
+		TypedData_Get_Struct(sh_sym, Elf32_Sym, &rb_elf32sym_type, pSym);
+		fprintf(stdout, "st_name:[%d], ", pSym->st_name);
+		fprintf(stdout, "st_value:[%d], ", pSym->st_value);
+		fprintf(stdout, "st_size:[%d], ", pSym->st_size);
+		fprintf(stdout, "st_info:[%d], ", pSym->st_info);
+		fprintf(stdout, "st_other:[%d], ", pSym->st_other);
+		fprintf(stdout, "st_shndx:[%d]\n", pSym->st_shndx);
+	}
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	return Qnil;
 }
 
 void init_elf32sym(void)
 {
 	rb_cElf32_Sym = rb_define_class_under( rb_elfModule, "Elf32Sym" , rb_cObject );
     rb_define_alloc_func(rb_cElf32_Sym, elf32sym_alloc);
+	rb_define_singleton_method( rb_cElf32_Sym, "show_symtab", elf32sym_show_symtab, 1 );
 	return;
 }
 
@@ -187,7 +211,7 @@ static VALUE elf32_get_symtab(VALUE self)
 	size = pShdr->sh_size;
 	while(0 < size)
 	{
-		rb_ary_push(ary, elf32sym_Shm(pSymtab));
+		rb_ary_push(ary, elf32sym_Sym(pSymtab));
 		pSymtab++;
 		size -= sizeof(Elf32_Sym);
 	}
@@ -196,6 +220,36 @@ static VALUE elf32_get_symtab(VALUE self)
 	return ary;
 }
 
+#if 1
+static VALUE elf32_ary2symtab(VALUE self, VALUE ary)
+{
+	int i,len;
+	int count;
+	len = RARRAY_LEN(ary);
+	uint8_t *pBin;
+	Elf32_Sym *pSym;
+	VALUE symtab;
+
+	Check_Type( ary, T_ARRAY );
+	pBin = malloc(len);
+
+	for(i = 0; i < len; i++) {
+		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
+	}
+
+	pSym = (Elf32_Sym *)pBin;
+	symtab = rb_ary_new();
+	count = len / sizeof(Elf32_Sym);
+	for (i = 0; i < count; i++) {
+		// new しないと更新されない
+//		rb_ary_push(symtab, TypedData_Make_Struct(rb_cElf32_Sym, Elf32_Sym, &rb_elf32sym_type, pSym));
+		rb_ary_push(symtab, elf32sym_Sym(pSym));
+		pSym++;
+	}
+	return symtab;
+}
+
+#endif
 void Init_elf32( void ) {
 
 	rb_elfModule = rb_define_module( "ELF" );
@@ -204,26 +258,13 @@ void Init_elf32( void ) {
 	rb_define_method( rb_cElf32, "initialize", elf32_initialize, 1 );
 	rb_define_method( rb_cElf32, "show_Ehdr", elf32_show_Ehdr, 0 );
 	rb_define_method( rb_cElf32, "symtab", elf32_get_symtab, 0);
+	rb_define_singleton_method( rb_cElf32, "to_symtab", elf32_ary2symtab, 1);
 
 	init_elf32sym();
 	return;
 }
 
-
 #if 0
-static VALUE elf32_merge_section(VALUE self, VALUE obj, VALUE name)
-{
-	ST_ELF32 *pSelf, *pArg;
-	Elf32_Shdr *pSelfShdr;
-
-	// self	: 結合先
-	// obj	: 結合したいELFオブジェクト
-	// name	: 結合したいセクション名
-	TypedData_Get_Struct(obj, ST_ELF32, &rb_elf32_type, pArg);
-	ret = elf32_searchShdr(pSelf->pAddr, StringValuePtr(name), &pSelfShdr, &idx);
-	return Qnil;
-}
-
 static VALUE elf32_merge_symbols(VALUE self, VALUE arg)
 {
 	ST_ELF32 *pSelf, *pArg;
