@@ -9,18 +9,22 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-VALUE rb_elfModule;
-VALUE rb_cElf32;
-VALUE rb_cElf32_Ehdr;
-VALUE rb_cElf32Sym;
+// =============================================================================
+// static variables
+// =============================================================================
+static VALUE rb_elfModule;				// Module ELF
+static VALUE rb_cElf32;					// Class Elf32
+static VALUE rb_cElf32Sym;				// Class Elf32Sym
+static VALUE rb_cElf32Rel;				// Class Elf32Rel
+static VALUE rb_cElf32Rela;				// Class Elf32Rela
 
 // =============================================================================
-// ElfSym
+// Elf32Sym
 // =============================================================================
 static VALUE elf32sym_alloc(VALUE self);
 static VALUE rb_elf32sym_new(void);
-static size_t rb_elf32sym_size(const void *pObj);
-static void rb_elf32sym_free(void *pObj);
+static size_t rb_elf32sym_size(const void *ptr);
+static void rb_elf32sym_free(void *ptr);
 static VALUE elf32sym_struct2obj(const Elf32_Sym *pSym);
 static VALUE elf32sym_show(VALUE self);
 static VALUE elf32sym_get_st_name(VALUE self);
@@ -37,15 +41,45 @@ static VALUE elf32sym_get_st_shndx(VALUE self);
 static VALUE elf32sym_set_st_shndx(VALUE self, VALUE shndx);
 
 // =============================================================================
+// Elf32Rel
+// =============================================================================
+static VALUE elf32rel_alloc(VALUE self);
+static VALUE rb_elf32rel_new(void);
+static size_t rb_elf32rel_size(const void *ptr);
+static void rb_elf32rel_free(void *ptr);
+static VALUE elf32rel_struct2obj(const Elf32_Rel *pRel);
+static VALUE elf32rel_get_r_offset(VALUE self);
+static VALUE elf32rel_set_r_offset(VALUE self, VALUE offset);
+static VALUE elf32rel_get_r_info(VALUE self);
+static VALUE elf32rel_set_r_info(VALUE self, VALUE info);
+
+// =============================================================================
+// Elf32Rela
+// =============================================================================
+static VALUE elf32rela_alloc(VALUE self);
+static VALUE rb_elf32rela_new(void);
+static size_t rb_elf32rela_size(const void *ptr);
+static void rb_elf32rela_free(void *ptr);
+static VALUE elf32rela_struct2obj(const Elf32_Rela *pRela);
+static VALUE elf32rela_get_r_offset(VALUE self);
+static VALUE elf32rela_set_r_offset(VALUE self, VALUE offset);
+static VALUE elf32rela_get_r_info(VALUE self);
+static VALUE elf32rela_set_r_info(VALUE self, VALUE info);
+static VALUE elf32rela_get_r_addend(VALUE self);
+static VALUE elf32rela_set_r_addend(VALUE self, VALUE addend);
+
+// =============================================================================
 // Elf32
 // =============================================================================
 static VALUE elf32_alloc(VALUE klass);
-static void rb_elf32_free(void *pObj);
-static size_t rb_elf32_size(const void *pObj);
+static void rb_elf32_free(void *ptr);
+static size_t rb_elf32_size(const void *ptr);
 static VALUE elf32_initialize(VALUE self, VALUE filepath);
 static VALUE elf32_show_Ehdr(VALUE self);
 static VALUE elf32_get_symtab(VALUE self);
 static VALUE elf32_ary2symtab(VALUE self, VALUE ary);
+static VALUE elf32_ary2reltab(VALUE self, VALUE ary);
+static VALUE elf32_ary2relatab(VALUE self, VALUE ary);
 
 // =============================================================================
 // raise exception
@@ -91,8 +125,8 @@ static const rb_data_type_t rb_elf32sym_type = {
 // =============================================================================
 static VALUE elf32sym_alloc(VALUE self)
 {
-	Elf32_Sym *pObj;
-	return TypedData_Make_Struct(self, Elf32_Sym, &rb_elf32sym_type, pObj);
+	Elf32_Sym *ptr;
+	return TypedData_Make_Struct(self, Elf32_Sym, &rb_elf32sym_type, ptr);
 }
 
 // =============================================================================
@@ -106,12 +140,10 @@ static VALUE rb_elf32sym_new(void)
 // =============================================================================
 // Elf32Sym free
 // =============================================================================
-static void rb_elf32sym_free(void *pObj)
+static void rb_elf32sym_free(void *ptr)
 {
 	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
-
-	Elf32_Sym *pSym = (Elf32_Sym *)pObj;
-	free(pSym);
+	free(ptr);
 	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return;
 }
@@ -119,7 +151,7 @@ static void rb_elf32sym_free(void *pObj)
 // =============================================================================
 // Elf32Sym size
 // =============================================================================
-static size_t rb_elf32sym_size(const void *pObj)
+static size_t rb_elf32sym_size(const void *ptr)
 {
 	return sizeof(Elf32_Sym);
 }
@@ -288,6 +320,247 @@ static VALUE elf32sym_set_st_shndx(VALUE self, VALUE shndx)
 }
 
 // =============================================================================
+// Elf32Rel type info
+// =============================================================================
+static const rb_data_type_t rb_elf32rel_type = {
+    "ELF/Elf32Rel",
+    {
+		0,							// dmark
+    	rb_elf32rel_free,			// dfree
+    	rb_elf32rel_size,			// dsize
+    	{0},						// reserved
+    },
+    0,								// parent
+	0,								// for user
+	RUBY_TYPED_FREE_IMMEDIATELY,	// free when unused.
+};
+
+// =============================================================================
+// Elf32Rel alloc
+// =============================================================================
+static VALUE elf32rel_alloc(VALUE self)
+{
+	Elf32_Rel *ptr;
+	return TypedData_Make_Struct(self, Elf32_Rel, &rb_elf32rel_type, ptr);
+}
+
+// =============================================================================
+// Elf32Rel new
+// =============================================================================
+static VALUE rb_elf32rel_new(void)
+{
+	return elf32rel_alloc(rb_cElf32Rel);
+}
+
+// =============================================================================
+// Elf32Rel free
+// =============================================================================
+static void rb_elf32rel_free(void *ptr)
+{
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	free(ptr);
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	return;
+}
+
+// =============================================================================
+// Elf32Rel size
+// =============================================================================
+static size_t rb_elf32rel_size(const void *ptr)
+{
+	return sizeof(Elf32_Rel);
+}
+
+// =============================================================================
+// Elf32Rel create object from Elf32_Rel
+// =============================================================================
+static VALUE elf32rel_struct2obj(const Elf32_Rel *pRel)
+{
+	VALUE obj;
+	Elf32_Rel *ptr;
+	obj = rb_elf32rel_new();
+	TypedData_Get_Struct(obj, Elf32_Rel, &rb_elf32rel_type, ptr);
+	memcpy(ptr, pRel, sizeof(Elf32_Rel));
+	return obj;
+}
+
+// =============================================================================
+// Elf32Rel Get r_offset
+// =============================================================================
+static VALUE elf32rel_get_r_offset(VALUE self)
+{
+	Elf32_Rel *pRel;
+	TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+	return INT2NUM(pRel->r_offset);
+}
+
+// =============================================================================
+// Elf32Rel Set r_offset
+// =============================================================================
+static VALUE elf32rel_set_r_offset(VALUE self, VALUE offset)
+{
+	Elf32_Rel *pRel;
+	Check_Type(offset, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+	pRel->r_offset = NUM2INT(offset);
+	return self;
+}
+
+// =============================================================================
+// Elf32Rel Get r_info
+// =============================================================================
+static VALUE elf32rel_get_r_info(VALUE self)
+{
+	Elf32_Rel *pRel;
+	TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+	return INT2NUM(pRel->r_info);
+}
+
+// =============================================================================
+// Elf32Rel Set r_info
+// =============================================================================
+static VALUE elf32rel_set_r_info(VALUE self, VALUE info)
+{
+	Elf32_Rel *pRel;
+	Check_Type(info, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+	pRel->r_info = NUM2INT(info);
+	return self;
+}
+
+
+// =============================================================================
+// Elf32Rela type info
+// =============================================================================
+static const rb_data_type_t rb_elf32rela_type = {
+    "ELF/Elf32Rela",
+    {
+		0,							// dmark
+    	rb_elf32rela_free,			// dfree
+    	rb_elf32rela_size,			// dsize
+    	{0},						// reserved
+    },
+    0,								// parent
+	0,								// for user
+	RUBY_TYPED_FREE_IMMEDIATELY,	// free when unused.
+};
+
+// =============================================================================
+// Elf32Rela alloc
+// =============================================================================
+static VALUE elf32rela_alloc(VALUE self)
+{
+	Elf32_Rela *ptr;
+	return TypedData_Make_Struct(self, Elf32_Rela, &rb_elf32rela_type, ptr);
+}
+
+// =============================================================================
+// Elf32Rela new
+// =============================================================================
+static VALUE rb_elf32rela_new(void)
+{
+	return elf32rela_alloc(rb_cElf32Rela);
+}
+
+// =============================================================================
+// Elf32Rela free
+// =============================================================================
+static void rb_elf32rela_free(void *ptr)
+{
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	free(ptr);
+	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	return;
+}
+
+// =============================================================================
+// Elf32Rela size
+// =============================================================================
+static size_t rb_elf32rela_size(const void *ptr)
+{
+	return sizeof(Elf32_Rela);
+}
+
+// =============================================================================
+// Elf32Rela create object from Elf32_Rela
+// =============================================================================
+static VALUE elf32rela_struct2obj(const Elf32_Rela *pRela)
+{
+	VALUE obj;
+	Elf32_Rela *ptr;
+	obj = rb_elf32rela_new();
+	TypedData_Get_Struct(obj, Elf32_Rela, &rb_elf32rela_type, ptr);
+	memcpy(ptr, pRela, sizeof(Elf32_Rela));
+	return obj;
+}
+
+// =============================================================================
+// Elf32Rela Get r_offset
+// =============================================================================
+static VALUE elf32rela_get_r_offset(VALUE self)
+{
+	Elf32_Rela *pRela;
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+	return INT2NUM(pRela->r_offset);
+}
+
+// =============================================================================
+// Elf32Rela Set r_offset
+// =============================================================================
+static VALUE elf32rela_set_r_offset(VALUE self, VALUE offset)
+{
+	Elf32_Rela *pRela;
+	Check_Type(offset, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+	pRela->r_offset = NUM2INT(offset);
+	return self;
+}
+
+// =============================================================================
+// Elf32Rela Get r_info
+// =============================================================================
+static VALUE elf32rela_get_r_info(VALUE self)
+{
+	Elf32_Rela *pRela;
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+	return INT2NUM(pRela->r_info);
+}
+
+// =============================================================================
+// Elf32Rela Set r_info
+// =============================================================================
+static VALUE elf32rela_set_r_info(VALUE self, VALUE info)
+{
+	Elf32_Rela *pRela;
+	Check_Type(info, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+	pRela->r_info = NUM2INT(info);
+	return self;
+}
+
+// =============================================================================
+// Elf32Rela Get r_info
+// =============================================================================
+static VALUE elf32rela_get_r_addend(VALUE self)
+{
+	Elf32_Rela *pRela;
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+	return INT2NUM(pRela->r_addend);
+}
+
+// =============================================================================
+// Elf32Rela Set r_info
+// =============================================================================
+static VALUE elf32rela_set_r_addend(VALUE self, VALUE addend)
+{
+	Elf32_Rela *pRela;
+	Check_Type(addend, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+	pRela->r_addend = NUM2INT(addend);
+	return self;
+}
+
+// =============================================================================
 // ELF32 data type
 // =============================================================================
 static const rb_data_type_t rb_elf32_type = {
@@ -308,18 +581,18 @@ static const rb_data_type_t rb_elf32_type = {
 // =============================================================================
 static VALUE elf32_alloc(VALUE klass)
 {
-	ST_ELF32 *pObj;
-	return TypedData_Make_Struct(klass, ST_ELF32, &rb_elf32_type, pObj);
+	ST_ELF32 *ptr;
+	return TypedData_Make_Struct(klass, ST_ELF32, &rb_elf32_type, ptr);
 }
 
 // =============================================================================
 // ELF32 free
 // =============================================================================
-static void rb_elf32_free(void *pObj)
+static void rb_elf32_free(void *ptr)
 {
 	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 
-	ST_ELF32 *pElf32 = (ST_ELF32 *)pObj;
+	ST_ELF32 *pElf32 = (ST_ELF32 *)ptr;
     elf32_munmapFile(pElf32, pElf32->length);
 	free(pElf32);
 	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
@@ -329,9 +602,9 @@ static void rb_elf32_free(void *pObj)
 // =============================================================================
 // ELF32 size
 // =============================================================================
-static size_t rb_elf32_size(const void *pObj)
+static size_t rb_elf32_size(const void *ptr)
 {
-	ST_ELF32 *pElf32 = (ST_ELF32 *)pObj;
+	ST_ELF32 *pElf32 = (ST_ELF32 *)ptr;
 	return sizeof(ST_ELF32) + pElf32->length;
 }
 
@@ -439,19 +712,80 @@ static VALUE elf32_ary2symtab(VALUE self, VALUE ary)
 }
 
 // =============================================================================
+// ELF32 Create Elf32_Rel Array from Array(Byte Array)
+// =============================================================================
+static VALUE elf32_ary2reltab(VALUE self, VALUE ary)
+{
+	int i,len, count;
+	len = RARRAY_LEN(ary);
+	uint8_t *pBin;
+	Elf32_Rel *pRel;
+	VALUE reltab;
+
+	Check_Type( ary, T_ARRAY );
+
+	pBin = malloc(len);
+	for(i = 0; i < len; i++) {
+		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
+	}
+
+	pRel = (Elf32_Rel *)pBin;
+	reltab = rb_ary_new();
+	count = len / sizeof(Elf32_Rel);
+	for (i = 0; i < count; i++) {
+		rb_ary_push(reltab, elf32rel_struct2obj(pRel));
+		pRel++;
+	}
+	return reltab;
+}
+
+// =============================================================================
+// ELF32 Create Elf32_Rel Array from Array(Byte Array)
+// =============================================================================
+static VALUE elf32_ary2relatab(VALUE self, VALUE ary)
+{
+	int i,len, count;
+	len = RARRAY_LEN(ary);
+	uint8_t *pBin;
+	Elf32_Rela *pRela;
+	VALUE relatab;
+
+	Check_Type( ary, T_ARRAY );
+
+	pBin = malloc(len);
+	for(i = 0; i < len; i++) {
+		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
+	}
+
+	pRela = (Elf32_Rela *)pBin;
+	relatab = rb_ary_new();
+	count = len / sizeof(Elf32_Rela);
+	for (i = 0; i < count; i++) {
+		rb_ary_push(relatab, elf32rela_struct2obj(pRela));
+		pRela++;
+	}
+	return relatab;
+}
+
+// =============================================================================
 // Initialize ext Module
 // =============================================================================
 void Init_elf32( void ) {
 
+	// define ELF module
 	rb_elfModule = rb_define_module("ELF");
+
+	// Initialize rb_cElf32
 	rb_cElf32 = rb_define_class_under(rb_elfModule, "Elf32" , rb_cObject);
     rb_define_alloc_func(rb_cElf32, elf32_alloc);
 	rb_define_method(rb_cElf32, "initialize", elf32_initialize, 1);
 	rb_define_method(rb_cElf32, "show_Ehdr", elf32_show_Ehdr, 0);
 	rb_define_method(rb_cElf32, "symtab", elf32_get_symtab, 0);
 	rb_define_singleton_method( rb_cElf32, "to_symtab", elf32_ary2symtab, 1);
+	rb_define_singleton_method( rb_cElf32, "to_reltab", elf32_ary2reltab, 1);
+	rb_define_singleton_method( rb_cElf32, "to_relatab", elf32_ary2relatab, 1);
 
-	// Initialize Elf32Sym
+	// Initialize rb_cElf32Sym
 	rb_cElf32Sym = rb_define_class_under(rb_elfModule, "Elf32Sym" , rb_cObject);
     rb_define_alloc_func(rb_cElf32Sym, elf32sym_alloc);
 	rb_define_method(rb_cElf32Sym, "show", elf32sym_show, 0);
@@ -467,6 +801,24 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32Sym, "st_other=", elf32sym_set_st_other, 1);
 	rb_define_method(rb_cElf32Sym, "st_shndx", elf32sym_get_st_shndx, 0);
 	rb_define_method(rb_cElf32Sym, "st_shndx=", elf32sym_set_st_shndx, 1);
+
+	// Initialize rb_cElf32Rel
+	rb_cElf32Rel = rb_define_class_under(rb_elfModule, "Elf32Rel" , rb_cObject);
+    rb_define_alloc_func(rb_cElf32Rel, elf32rel_alloc);
+	rb_define_method(rb_cElf32Rel, "r_offset", elf32rel_get_r_offset, 0);
+	rb_define_method(rb_cElf32Rel, "r_offset=", elf32rel_set_r_offset, 1);
+	rb_define_method(rb_cElf32Rel, "r_info", elf32rel_get_r_info, 0);
+	rb_define_method(rb_cElf32Rel, "r_info=", elf32rel_set_r_info, 1);
+
+	// Initialize rb_cElf32Rela
+	rb_cElf32Rela = rb_define_class_under(rb_elfModule, "Elf32Rela" , rb_cObject);
+    rb_define_alloc_func(rb_cElf32Rela, elf32rela_alloc);
+	rb_define_method(rb_cElf32Rela, "r_offset", elf32rela_get_r_offset, 0);
+	rb_define_method(rb_cElf32Rela, "r_offset=", elf32rela_set_r_offset, 1);
+	rb_define_method(rb_cElf32Rela, "r_info", elf32rela_get_r_info, 0);
+	rb_define_method(rb_cElf32Rela, "r_info=", elf32rela_set_r_info, 1);
+	rb_define_method(rb_cElf32Rela, "r_addend", elf32rela_get_r_addend, 0);
+	rb_define_method(rb_cElf32Rela, "r_addend=", elf32rela_set_r_addend, 1);
 	return;
 }
 
