@@ -128,8 +128,9 @@ module ELF
 				last_section_name_size_map = {}
 				cur_section_name_size_map = {}
 				cur_section_idx_name_map = {}
-
+				tmp_rela_section_info = {}
 				tmp_symtab_info = {}
+
 				elf_object.section_h_map.each_pair do |section_name, section_info|
 					if linked_sh_name_offset_map[section_name].nil?
 						# 最初のオブジェクトのオフセット位置
@@ -137,6 +138,22 @@ module ELF
 					end
 					cur_section_name_size_map[section_name] = section_info[:size]
 					cur_section_idx_name_map[sh_idx] = section_name
+
+					# ================================================
+					# relaセクション対応
+					# relaセクションは退避してあとで情報を更新する
+					# ================================================
+					if section_name == ".relaPResetPRG"
+						rela_bin = elf_object.get_section_data(section_name)
+						tmp_rela_section_info[section_name] = {section_info: section_info, bin: rela_bin}
+						# PResetPRGセクションのオフセット
+						next
+					end
+					if section_name == ".relaFIXEDVECT"
+						rela_bin = elf_object.get_section_data(section_name)
+						tmp_rela_section_info = {section_info: section_info, bin: rela_bin}
+						next
+					end
 
 					# .symtab は更新作業あるので対しして後で別途結合
 					if section_name == ".symtab"
@@ -147,8 +164,7 @@ module ELF
 
 					# セクションサイズ分オフセットを更新(実体のない(SH_TYPE_NOBITS)セクションは更新不要)
 					unless section_info[:type] == SH_TYPE_NOBITS
-						# TODO 要確認
-						#tmp_offset += section_info[:size]
+						# TODO 要確認 SH_TYPE_NOBITSを考慮しなくてよい？
 					end
 
 					# セクション情報の初期化
@@ -178,11 +194,23 @@ module ELF
 				end
 
 				# ==================================================
+				# リロケーションテーブル更新
+				# ==================================================
+				unless tmp_rela_section_info[".relaPResetPRG"].nil?
+					rela_p_reset = tmp_rela_section_info[".relaPResetPRG"][:bin]
+					relatab = Elf32.to_relatab(rela_p_reset)
+					relatab.each do |rela|
+						# PResetPRGセクションの現在のオフセットを参照
+						rela.r_offset += linked_sh_name_offset_map
+						# TODO r_info,r_addendは何もしなくてよいか?
+				end
+
+				# ==================================================
 				# シンボル情報更新
 				# ==================================================
-				# セクション情報の初期化
-					if linked_section_map[".symtab"].nil?
-						# 最初のオブジェクト → 参照情報の更新不要
+				# TODO 更新した シンボルテーブルの結合の次フェーズでの活用
+				if linked_section_map[".symtab"].nil?
+					# 最初のオブジェクト → 参照情報の更新不要
 					linked_section_map[section_name] = tmp_symtab_info
 
 					# 参照するセクション情報を更新
@@ -191,6 +219,7 @@ module ELF
 					# 2オブジェクト目以降のシンボルテーブル →オフセット位置などの更新を行う
 					sym_ary = Elf32.to_symtab(tmp_symtab_info[:bin])
 					sym_ary.each do |sym|
+						# シンボルテーブルが参照するセクション名を取得
 						section_name = cur_section_idx_name_map[sym.st_shndx]
 
 						# シンボル名文字列のサイズを取得しシンボルのオフセットを更新
@@ -212,10 +241,6 @@ module ELF
 					# 参照するセクション情報を更新
 					last_section_name_size_map = cur_section_name_size_map
 				end
-
-				# シンボルテーブルのインデックスは後で決める
-				# .strtab, .textとかの参照するセクションのインデックスはとりあえず最初に
-				symtab = linked_section_map[".symtab"]
 			end
 
 			# ========================================================================
