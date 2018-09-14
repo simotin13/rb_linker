@@ -1,5 +1,6 @@
 require 'elf'
 require 'linker'
+require 'elf32'
 module ELF
 
 	# ============================================================================
@@ -102,15 +103,14 @@ module ELF
 	    check_elf_header(objs)
 
 			linked_section_map = {}
-			linked_offset = 0
 			symbols = []
 
 			# ========================================================================
 			# 各オブジェクトファイル毎にリンク処理を行う
 			# ========================================================================
 			rel_secions = {}
+			linked_sh_name_offset_map = {}
 			objs.each do |elf_object|
-				tmp_offset = 0
 
 				# ======================================================================
 				# リンクする必要がないセクションはここで削除
@@ -123,37 +123,99 @@ module ELF
 				# リロケーションの情報を保持しておく
 				rel_secions = elf_object.rel_sections
 
-				# 同一のセクションのデータを配列としてまとめる
-				elf_object.section_h_map.each_pair do |section_name, section_info|
+				# 同一のセクションのデータをまとめる
+				sh_idx = 0
+				last_section_name_size_map = {}
+				cur_section_name_size_map = {}
+				cur_section_idx_name_map = {}
 
-					# セクションサイズ分オフセットを更新
+				tmp_symtab_info = {}
+				elf_object.section_h_map.each_pair do |section_name, section_info|
+					if linked_sh_name_offset_map[section_name].nil?
+						# 最初のオブジェクトのオフセット位置
+						linked_sh_name_offset_map[section_name] = 0
+					end
+					cur_section_name_size_map[section_name] = section_info[:size]
+					cur_section_idx_name_map[sh_idx] = section_name
+
+					# .symtab は更新作業あるので対しして後で別途結合
+					if section_name == ".symtab"
+						symtab_bin = elf_object.get_section_data(section_name)
+						tmp_symtab_info = {section_info: section_info, bin: symtab_bin}
+						next	# .symtabは後回しにして次のセクションへ
+					end
+
+					# セクションサイズ分オフセットを更新(実体のない(SH_TYPE_NOBITS)セクションは更新不要)
 					unless section_info[:type] == SH_TYPE_NOBITS
-						tmp_offset += section_info[:size]
+						# TODO 要確認
+						#tmp_offset += section_info[:size]
 					end
 
 					# セクション情報の初期化
  					if linked_section_map[section_name].nil?
+ 						# 初めて登場する → リンクするセクションマップに登録
 						linked_section_map[section_name] = {section_info: section_info, bin: []}
 					else
-						# 同一セクションのマージ → サイズ情報を更新
+						# 既に登録されているセクション → サイズ情報を更新
 						linked_section_map[section_name][:section_info][:size] += section_info[:size]
 					end
 
-					# セクションデータ取得し結合する
+					# セクションの実態を取得し結合する
 					secion_bin = elf_object.get_section_data(section_name)
 					if secion_bin.nil?
 						puts "#{section_name} is nil."
-						next
+					else
+						linked_section_map[section_name][:bin].concat(secion_bin)
 					end
 
-					linked_section_map[section_name][:bin].concat(secion_bin)
+					# DEBUG セクション情報とセクション実体のサイズが一致しているか確認
+					# 一致しない場合もあり得る？
+					unless linked_section_map[section_name][:bin].size == linked_section_map[section_name][:section_info][:size]
+						throw "Link secion size not match!"
+					end
+
+					sh_idx += 1
 				end
 
-				# オブジェクトファイル単位で セクションサイズのオフセットを更新
-				linked_offset += tmp_offset
-
+				# ==================================================
 				# シンボル情報更新
-				# TODO マージされたセクションの情報でシンボルテーブルを更新する
+				# ==================================================
+				# セクション情報の初期化
+					if linked_section_map[".symtab"].nil?
+						# 最初のオブジェクト → 参照情報の更新不要
+					linked_section_map[section_name] = tmp_symtab_info
+
+					# 参照するセクション情報を更新
+					last_section_name_size_map = cur_section_name_size_map
+				else
+					# 2オブジェクト目以降のシンボルテーブル →オフセット位置などの更新を行う
+					sym_ary = Elf32.to_symtab(tmp_symtab_info[:bin])
+					sym_ary.each do |sym|
+						section_name = cur_section_idx_name_map[sym.st_shndx]
+
+						# シンボル名文字列のサイズを取得しシンボルのオフセットを更新
+						sym.st_name += last_section_name_size_map[".strtab"]
+
+						# 該当するセクションのオフセット位置を取得
+						# これまでに結合したセクションの合計サイズが、
+						# 次に結合するセクションのオフセット位置になる
+						sym.st_value += linked_sh_name_offset_map[section_name]
+
+						# オフセット位置を更新
+						linked_sh_name_offset_map[section_name] += cur_section_name_size_map[section_name]
+
+						# 参照するセクションインデックスの更新
+						# TODO ここでしない方がよい？
+						sym.st_shndx = linked_section_map[section_name][:section_info][:idx]
+					end
+
+					# 参照するセクション情報を更新
+					last_section_name_size_map = cur_section_name_size_map
+				end
+
+				# シンボルテーブルのインデックスは後で決める
+				# .strtab, .textとかの参照するセクションのインデックスはとりあえず最初に
+				symtab = linked_section_map[".symtab"]
 			end
 
 			# ========================================================================
@@ -209,11 +271,6 @@ module ELF
 					# とりあえずROM/RAM展開はなし
 					program_h_info[:p_vaddr]  = section_info[:va_address]
 					program_h_info[:p_paddr]  = section_info[:offset]
-
-					# TODO 計算済み?
-					# セクション情報をVirtualAddrssで更新
-					#section_info[:va_address] = section_addr
-
 					program_h_info[:p_filesz] = section_info[:size]
 					program_h_info[:p_memsz]  = section_info[:size]
 
@@ -246,7 +303,6 @@ module ELF
 			prog_h_size = ELF_SIZE_ELF32_PROG_HEADER
 			linked_header.elf_program_h_size = ELF_SIZE_ELF32_PROG_HEADER
 			linked_header.elf_program_h_num = prog_headers.length
-
 			linked_header.elf_section_name_idx = linked_section_map[".shstrtab"][:section_info][:idx]
 
 			# ========================================================================
