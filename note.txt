@@ -1,0 +1,33 @@
+・複数オブジェクトを結合するとき同じセクションが異なるインデックスで配置される可能性がある。
+→インデックスを使用するのはElf32_Sym->st_shndx, Elf32_Ehdr->e_shstrndx のみ。
+
+セクション名をキーとしてセクションを結合する場合、
+シンボルテーブル側は該当するシンボルの
+st_name		: .strtab内でのオフセット位置
+st_value	: 該当セクション内でのシンボル実体のオフセット位置それまでのオフセット
+st_shndx	: 参照先セクション→最終的に決まる?
+オフセットのみを更新すればよい。
+
+st_name		: .strtabオブジェクト内で加算されていれば加算(必ず加算されているはず
+st_value	: 該当セクションを検索してそのオフセット位置を加算
+
+Relセクションは対応するセクションに関する情報を保持している。
+例えば、 .rel.text は .text セクションの情報を保持している。
+r_offset	: 該当セクションにおけるリロケーションを行うオフセット位置
+typedef struct {
+        Elf32_Addr      r_offset;
+        Elf32_Word      r_info;
+} Elf32_Rel;
+typedef struct {
+        Elf32_Addr      r_offset;
+        Elf32_Word      r_info;
+        Elf32_Sword     r_addend;
+} Elf32_Rela;
+
+Relocation section '.rel.text' at offset 0x1d8 contains 1 entries:
+ Offset     Info    Type            Sym.Value  Sym. Name
+00000024  00000e02 R_ARM_ABS32       00000000   ext_val
+
+Relocation section '.rel.data' at offset 0x1e0 contains 1 entries:
+ Offset     Info    Type            Sym.Value  Sym. Name
+00000000  00000c02 R_ARM_ABS32       00000000   ext_hoge
