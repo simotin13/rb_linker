@@ -1,5 +1,7 @@
-require './monkey_patch'
-require './machine_arch_list'
+require 'monkey_patch'
+
+require 'ELF'
+require 'machine_arch_list'
 
 module ELF
 	class ElfObject
