@@ -90,6 +90,7 @@ module ELF
 			puts link_options
 
 			# 同一クラスかどうかチェック
+			puts "Input object files #{link_options[:input]}"
 			link_options[:input].each do |input_file|
 			  elf_obj = ELF::ElfObject.new(input_file)
 			  if elf_class.nil?
@@ -115,9 +116,10 @@ module ELF
 				# ======================================================================
 				# リンクする必要がないセクションはここで削除
 				# ======================================================================
-				elf_object.delete_section_info("$iop") if elf_object.has_section?("$iop")
-				elf_object.delete_section_info(".relaPResetPRG") if elf_object.has_section?(".relaPResetPRG")
-				elf_object.delete_section_info(".relaFIXEDVECT") if elf_object.has_section?(".relaFIXEDVECT")
+				# TODO ここで消すとシンボルテーブルの参照インデックスを更新する際に値がずれる....
+				#elf_object.delete_section_info("$iop") if elf_object.has_section?("$iop")
+				#elf_object.delete_section_info(".relaPResetPRG") if elf_object.has_section?(".relaPResetPRG")
+				#elf_object.delete_section_info(".relaFIXEDVECT") if elf_object.has_section?(".relaFIXEDVECT")
 				symbols.concat(elf_object.symbol_table)
 
 				# リロケーションの情報を保持しておく
@@ -125,13 +127,13 @@ module ELF
 
 				# 同一のセクションのデータをまとめる
 				sh_idx = 0
-				last_section_name_size_map = {}
 				cur_section_name_size_map = {}
 				cur_section_idx_name_map = {}
 				tmp_rela_section_info = {}
 				tmp_symtab_info = {}
 
 				elf_object.section_h_map.each_pair do |section_name, section_info|
+
 					if linked_sh_name_offset_map[section_name].nil?
 						# 最初のオブジェクトのオフセット位置
 						linked_sh_name_offset_map[section_name] = 0
@@ -163,8 +165,10 @@ module ELF
 					end
 
 					# セクションサイズ分オフセットを更新(実体のない(SH_TYPE_NOBITS)セクションは更新不要)
-					unless section_info[:type] == SH_TYPE_NOBITS
+					if section_info[:type] == SH_TYPE_NOBITS
 						# TODO 要確認 SH_TYPE_NOBITSを考慮しなくてよい？
+						puts "#{section_name} is NOBITS"
+						next
 					end
 
 					# セクション情報の初期化
@@ -187,10 +191,64 @@ module ELF
 					# DEBUG セクション情報とセクション実体のサイズが一致しているか確認
 					# 一致しない場合もあり得る？
 					unless linked_section_map[section_name][:bin].size == linked_section_map[section_name][:section_info][:size]
+						puts section_name
+						puts linked_section_map[section_name][:section_info][:type]
+						puts "bin:#{linked_section_map[section_name][:bin].size.to_h}, info:#{linked_section_map[section_name][:section_info][:size].to_h}"
 						throw "Link secion size not match!"
 					end
 
 					sh_idx += 1
+				end
+
+				# TODO 更新した シンボルテーブルの結合の次フェーズでの活用
+				if linked_section_map[".symtab"].nil?
+					puts "first time.."
+					puts cur_section_name_size_map
+					# 最初のオブジェクト → 参照情報の更新不要
+					linked_section_map[".symtab"] = tmp_symtab_info
+				else
+					puts "second time..."
+					cur_symtab = Elf32.to_symtab(linked_section_map[".symtab"][:bin])
+
+					# 2オブジェクト目以降のシンボルテーブル →オフセット位置などの更新を行う
+					sym_ary = Elf32.to_symtab(tmp_symtab_info[:bin])
+					sym_ary.each do |sym|
+						# シンボル名文字列のサイズを取得しシンボルのオフセットを更新
+						sym.st_name += linked_sh_name_offset_map[".strtab"]
+
+						# シンボルテーブルが参照するセクション名を取得
+						case sym.st_shndx
+						when SHN_LORESERVE, SHN_LOPROC, SHN_BEFORE, SHN_AFTER, SHN_HIPROC, SHN_LOOS, SHN_HIOS, SHN_ABS, SHN_COMMON, SHN_XINDEX, SHN_HIRESERVE
+							puts "special case.."
+							next
+						else
+							puts cur_section_idx_name_map
+							puts "sym.st_shndx:#{sym.st_shndx.to_h}"
+							ref_section_name = cur_section_idx_name_map[sym.st_shndx]
+						end
+
+						if sym.type == STT_NOTYPE
+							puts "notype"
+							next
+						end
+
+						# 該当するセクションのオフセット位置を取得
+						# これまでに結合したセクションの合計サイズが、
+						# 次に結合するセクションのオフセット位置になる
+						puts sym.show
+						puts cur_section_idx_name_map
+						sym.st_value += linked_sh_name_offset_map[ref_section_name]
+						puts "ffffffffffffffffffff"
+						puts linked_section_map[ref_section_name]
+
+						# 参照するセクションインデックスの更新
+						# TODO ここでしない方がよい？
+						# →この段階では linked_section_mapは確定していない
+						#sym.st_shndx = linked_section_map[section_name][:section_info][:idx]
+
+						# 更新したシンボル情報を結合
+						linked_section_map[".symtab"][:bin].concat(sym.to_bin)
+					end
 				end
 
 				# ==================================================
@@ -202,45 +260,17 @@ module ELF
 					relatab.each do |rela|
 						# PResetPRGセクションの現在のオフセットを参照
 						rela.r_offset += linked_sh_name_offset_map
-						# TODO r_info,r_addendは何もしなくてよいか?
-					end
-				end
-
-				# ==================================================
-				# シンボル情報更新
-				# ==================================================
-				# TODO 更新した シンボルテーブルの結合の次フェーズでの活用
-				if linked_section_map[".symtab"].nil?
-					# 最初のオブジェクト → 参照情報の更新不要
-					linked_section_map[section_name] = tmp_symtab_info
-
-					# 参照するセクション情報を更新
-					last_section_name_size_map = cur_section_name_size_map
-				else
-					# 2オブジェクト目以降のシンボルテーブル →オフセット位置などの更新を行う
-					sym_ary = Elf32.to_symtab(tmp_symtab_info[:bin])
-					sym_ary.each do |sym|
-						# シンボルテーブルが参照するセクション名を取得
-						section_name = cur_section_idx_name_map[sym.st_shndx]
-
-						# シンボル名文字列のサイズを取得しシンボルのオフセットを更新
-						sym.st_name += last_section_name_size_map[".strtab"]
-
-						# 該当するセクションのオフセット位置を取得
-						# これまでに結合したセクションの合計サイズが、
-						# 次に結合するセクションのオフセット位置になる
-						sym.st_value += linked_sh_name_offset_map[section_name]
-
-						# オフセット位置を更新
-						linked_sh_name_offset_map[section_name] += cur_section_name_size_map[section_name]
-
-						# 参照するセクションインデックスの更新
+						# 再配置を行うシンボルインデックスの更新
 						# TODO ここでしない方がよい？
 						sym.st_shndx = linked_section_map[section_name][:section_info][:idx]
 					end
+				end
 
-					# 参照するセクション情報を更新
-					last_section_name_size_map = cur_section_name_size_map
+				# =====================================================
+				# オフセット位置を更新
+				# =====================================================
+				cur_section_name_size_map.each do |section_name, offset|
+					linked_sh_name_offset_map[section_name] += offset
 				end
 			end
 
