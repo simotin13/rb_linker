@@ -1,6 +1,5 @@
 require 'monkey_patch'
-
-require 'ELF'
+require 'elf'
 require 'machine_arch_list'
 
 module ELF
