@@ -35,6 +35,10 @@ static VALUE elf32sym_get_st_size(VALUE self);
 static VALUE elf32sym_set_st_size(VALUE self, VALUE size);
 static VALUE elf32sym_get_st_info(VALUE self);
 static VALUE elf32sym_set_st_info(VALUE self, VALUE info);
+static VALUE elf32sym_get_scope(VALUE self);
+static VALUE elf32sym_set_scope(VALUE self, VALUE info);
+static VALUE elf32sym_get_type(VALUE self);
+static VALUE elf32sym_set_type(VALUE self, VALUE info);
 static VALUE elf32sym_get_st_other(VALUE self);
 static VALUE elf32sym_set_st_other(VALUE self, VALUE other);
 static VALUE elf32sym_get_st_shndx(VALUE self);
@@ -179,7 +183,6 @@ static VALUE elf32sym_struct2obj(const Elf32_Sym *pSym)
 static VALUE elf32sym_show(VALUE self)
 {
 	Elf32_Sym *pSym;
-	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
 	fprintf(stdout, "st_name:[%d], ", pSym->st_name);
 	fprintf(stdout, "st_value:[%d], ", pSym->st_value);
@@ -187,7 +190,6 @@ static VALUE elf32sym_show(VALUE self)
 	fprintf(stdout, "st_info:[%d], ", pSym->st_info);
 	fprintf(stdout, "st_other:[%d], ", pSym->st_other);
 	fprintf(stdout, "st_shndx:[%d]\n", pSym->st_shndx);
-	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return Qnil;
 }
 
@@ -276,6 +278,50 @@ static VALUE elf32sym_set_st_info(VALUE self, VALUE info)
 	Check_Type(info, T_FIXNUM);
 	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
 	pSym->st_info = NUM2INT(info);
+	return self;
+}
+
+// =============================================================================
+// Elf32Sym Get scope
+// =============================================================================
+static VALUE elf32sym_get_scope(VALUE self)
+{
+	Elf32_Sym *pSym;
+	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
+	return INT2NUM(ELF32_ST_BIND(pSym->st_info));
+}
+
+// =============================================================================
+// Elf32Sym Set scope
+// =============================================================================
+static VALUE elf32sym_set_scope(VALUE self, VALUE scope)
+{
+	Elf32_Sym *pSym;
+	Check_Type(scope, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
+	pSym->st_info = ELF32_ST_INFO( NUM2INT(scope), ELF32_ST_TYPE(pSym->st_info) );
+	return self;
+}
+
+// =============================================================================
+// Elf32Sym Get type
+// =============================================================================
+static VALUE elf32sym_get_type(VALUE self)
+{
+	Elf32_Sym *pSym;
+	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
+	return INT2NUM(ELF32_ST_TYPE(pSym->st_info));
+}
+
+// =============================================================================
+// Elf32Sym Set type
+// =============================================================================
+static VALUE elf32sym_set_type(VALUE self, VALUE type)
+{
+	Elf32_Sym *pSym;
+	Check_Type(type, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
+	pSym->st_info = ELF32_ST_INFO( ELF32_ST_BIND(pSym->st_info), ELF32_ST_TYPE(NUM2INT(type)) );
 	return self;
 }
 
@@ -913,6 +959,35 @@ void Init_elf32( void ) {
 	// define ELF module
 	rb_elfModule = rb_define_module("ELF");
 
+	// for Elf_Sym st_info
+	rb_define_const(rb_elfModule, "STT_NOTYPE",		INT2FIX(STT_NOTYPE));
+	rb_define_const(rb_elfModule, "STT_OBJECT",		INT2FIX(STT_OBJECT));
+	rb_define_const(rb_elfModule, "STT_FUNC",		INT2FIX(STT_FUNC));
+	rb_define_const(rb_elfModule, "STT_SECTION",	INT2FIX(STT_SECTION));
+	rb_define_const(rb_elfModule, "STT_FILE",		INT2FIX(STT_FILE));
+	rb_define_const(rb_elfModule, "STT_COMMON",		INT2FIX(STT_COMMON));
+	rb_define_const(rb_elfModule, "STT_TLS",		INT2FIX(STT_TLS));
+	rb_define_const(rb_elfModule, "STT_NUM",		INT2FIX(STT_NUM));
+	rb_define_const(rb_elfModule, "STT_LOOS",		INT2FIX(STT_LOOS));
+	rb_define_const(rb_elfModule, "STT_GNU_IFUNC",	INT2FIX(STT_GNU_IFUNC));
+	rb_define_const(rb_elfModule, "STT_HIOS",		INT2FIX(STT_HIOS));
+	rb_define_const(rb_elfModule, "STT_LOPROC",		INT2FIX(STT_LOPROC));
+	rb_define_const(rb_elfModule, "STT_HIPROC",		INT2FIX(STT_HIPROC));
+
+	// for Elf_Sym st_shndx
+	rb_define_const(rb_elfModule, "SHN_UNDEF",		INT2FIX(SHN_UNDEF));
+	rb_define_const(rb_elfModule, "SHN_LORESERVE",  INT2FIX(SHN_LORESERVE));
+	rb_define_const(rb_elfModule, "SHN_LOPROC",     INT2FIX(SHN_LOPROC));
+	rb_define_const(rb_elfModule, "SHN_BEFORE",     INT2FIX(SHN_BEFORE));
+	rb_define_const(rb_elfModule, "SHN_AFTER",      INT2FIX(SHN_AFTER));
+	rb_define_const(rb_elfModule, "SHN_HIPROC",     INT2FIX(SHN_HIPROC));
+	rb_define_const(rb_elfModule, "SHN_LOOS",       INT2FIX(SHN_LOOS));
+	rb_define_const(rb_elfModule, "SHN_HIOS",       INT2FIX(SHN_HIOS));
+	rb_define_const(rb_elfModule, "SHN_ABS",        INT2FIX(SHN_ABS));
+	rb_define_const(rb_elfModule, "SHN_COMMON",     INT2FIX(SHN_COMMON));
+	rb_define_const(rb_elfModule, "SHN_XINDEX",     INT2FIX(SHN_XINDEX));
+	rb_define_const(rb_elfModule, "SHN_HIRESERVE",  INT2FIX(SHN_HIRESERVE));
+
 	// Initialize rb_cElf32
 	rb_cElf32 = rb_define_class_under(rb_elfModule, "Elf32" , rb_cObject);
     rb_define_alloc_func(rb_cElf32, elf32_alloc);
@@ -935,6 +1010,10 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32Sym, "st_size=", elf32sym_set_st_size, 1);
 	rb_define_method(rb_cElf32Sym, "st_info", elf32sym_get_st_info, 0);
 	rb_define_method(rb_cElf32Sym, "st_info=", elf32sym_set_st_info, 1);
+	rb_define_method(rb_cElf32Sym, "scope", elf32sym_get_scope, 0);
+	rb_define_method(rb_cElf32Sym, "scope=", elf32sym_set_scope, 1);
+	rb_define_method(rb_cElf32Sym, "type", elf32sym_get_type, 0);
+	rb_define_method(rb_cElf32Sym, "type=", elf32sym_set_type, 1);
 	rb_define_method(rb_cElf32Sym, "st_other", elf32sym_get_st_other, 0);
 	rb_define_method(rb_cElf32Sym, "st_other=", elf32sym_set_st_other, 1);
 	rb_define_method(rb_cElf32Sym, "st_shndx", elf32sym_get_st_shndx, 0);
