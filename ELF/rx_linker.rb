@@ -26,7 +26,7 @@ module ELF
 	    # check ELF Header of each objects
 	    true
 	  end
-	  
+
 	  # .clnkファイルの内容を取得する
 	  def get_options clnk_file
 
@@ -203,6 +203,7 @@ module ELF
 						# PResetPRGセクションの現在のオフセットを参照
 						rela.r_offset += linked_sh_name_offset_map
 						# TODO r_info,r_addendは何もしなくてよいか?
+					end
 				end
 
 				# ==================================================
