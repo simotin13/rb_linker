@@ -39,6 +39,7 @@ static VALUE elf32sym_get_st_other(VALUE self);
 static VALUE elf32sym_set_st_other(VALUE self, VALUE other);
 static VALUE elf32sym_get_st_shndx(VALUE self);
 static VALUE elf32sym_set_st_shndx(VALUE self, VALUE shndx);
+static VALUE elf32sym_to_bin(VALUE self);
 
 // =============================================================================
 // Elf32Rel
@@ -67,6 +68,11 @@ static VALUE elf32rela_get_r_info(VALUE self);
 static VALUE elf32rela_set_r_info(VALUE self, VALUE info);
 static VALUE elf32rela_get_r_addend(VALUE self);
 static VALUE elf32rela_set_r_addend(VALUE self, VALUE addend);
+static VALUE elf32rela_get_symbolIdx(VALUE self);
+static VALUE elf32rela_set_symbolIdx(VALUE self, VALUE new_idx);
+static VALUE elf32rela_get_type(VALUE self);
+static VALUE elf32rela_set_type(VALUE self, VALUE type);
+static VALUE elf32rela_show(VALUE self);
 
 // =============================================================================
 // Elf32
@@ -93,7 +99,7 @@ static void raise_exception(const char *fname, int lnum)
 // =============================================================================
 // debug printf
 // =============================================================================
-static void dbg_printf(const char *fmt, ...)
+static void dbg_puts(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
@@ -142,9 +148,7 @@ static VALUE rb_elf32sym_new(void)
 // =============================================================================
 static void rb_elf32sym_free(void *ptr)
 {
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	free(ptr);
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return;
 }
 
@@ -175,7 +179,7 @@ static VALUE elf32sym_struct2obj(const Elf32_Sym *pSym)
 static VALUE elf32sym_show(VALUE self)
 {
 	Elf32_Sym *pSym;
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
 	fprintf(stdout, "st_name:[%d], ", pSym->st_name);
 	fprintf(stdout, "st_value:[%d], ", pSym->st_value);
@@ -183,7 +187,7 @@ static VALUE elf32sym_show(VALUE self)
 	fprintf(stdout, "st_info:[%d], ", pSym->st_info);
 	fprintf(stdout, "st_other:[%d], ", pSym->st_other);
 	fprintf(stdout, "st_shndx:[%d]\n", pSym->st_shndx);
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return Qnil;
 }
 
@@ -320,6 +324,25 @@ static VALUE elf32sym_set_st_shndx(VALUE self, VALUE shndx)
 }
 
 // =============================================================================
+// Elf32Sym Convert to binary
+// =============================================================================
+static VALUE elf32sym_to_bin(VALUE self)
+{
+	size_t i;
+	Elf32_Sym *pSym;
+	uint8_t *pBin;
+	VALUE ary;
+	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
+
+	ary = rb_ary_new();
+	pBin = (uint8_t *)pSym;
+	for(i = 0; i < sizeof(Elf32_Sym); i++) {
+		rb_ary_push(ary, INT2FIX(pBin[i]));
+	}
+	return ary;
+}
+
+// =============================================================================
 // Elf32Rel type info
 // =============================================================================
 static const rb_data_type_t rb_elf32rel_type = {
@@ -357,9 +380,9 @@ static VALUE rb_elf32rel_new(void)
 // =============================================================================
 static void rb_elf32rel_free(void *ptr)
 {
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	free(ptr);
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return;
 }
 
@@ -467,9 +490,9 @@ static VALUE rb_elf32rela_new(void)
 // =============================================================================
 static void rb_elf32rela_free(void *ptr)
 {
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	free(ptr);
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return;
 }
 
@@ -539,7 +562,107 @@ static VALUE elf32rela_set_r_info(VALUE self, VALUE info)
 }
 
 // =============================================================================
-// Elf32Rela Get r_info
+// Elf32Rela Get symbol index (higher 24bit bits of r_info)
+// =============================================================================
+static VALUE elf32rela_get_symbolIdx(VALUE self)
+{
+	Elf32_Rel *pRel;
+	Elf32_Rela *pRela;
+	VALUE	idx;
+	if (strcmp("ELF::Elf32Rel", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+		idx = INT2NUM( (pRel->r_info & 0xFFFFFF00)  >> 8 );
+	}
+	else if (strcmp("ELF::Elf32Rela", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+		idx = INT2NUM( (pRela->r_info & 0xFFFFFF00)  >> 8 );
+	}
+	else
+	{
+		raise_exception(__FUNCTION__, __LINE__);
+	}
+	return idx;
+}
+
+// =============================================================================
+// Elf32Rela Set symbol index (higher 24bit bits of r_info)
+// =============================================================================
+static VALUE elf32rela_set_symbolIdx(VALUE self, VALUE idx)
+{
+	Elf32_Rel *pRel;
+	Elf32_Rela *pRela;
+	Check_Type(idx, T_FIXNUM);
+	if (strcmp("ELF::Elf32Rel", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+		pRel->r_info = ((NUM2INT(idx) << 8) & 0xFFFFFF00) | (pRel->r_info & 0x000000FF);
+	}
+	else if (strcmp("ELF::Elf32Rela", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+		pRela->r_info = ((NUM2INT(idx) << 8) & 0xFFFFFF00) | (pRela->r_info & 0x000000FF);
+	}
+	else
+	{
+		raise_exception(__FUNCTION__, __LINE__);
+	}
+	return self;
+}
+
+// =============================================================================
+// Elf32Rela Get symbol index (lower 8bit bits of r_info)
+// =============================================================================
+static VALUE elf32rela_get_type(VALUE self)
+{
+	Elf32_Rel *pRel;
+	Elf32_Rela *pRela;
+	VALUE	idx;
+	if (strcmp("ELF::Elf32Rel", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+		idx = INT2NUM((pRel->r_info & 0x000000FF));
+	}
+	else if (strcmp("ELF::Elf32Rela", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+		idx = INT2NUM((pRela->r_info & 0x000000FF));
+	}
+	else
+	{
+		raise_exception(__FUNCTION__, __LINE__);
+	}
+	return idx;
+}
+
+// =============================================================================
+// Elf32Rela Set type (lower 8bit bits of r_info)
+// =============================================================================
+static VALUE elf32rela_set_type(VALUE self, VALUE type)
+{
+	Elf32_Rel *pRel;
+	Elf32_Rela *pRela;
+	Check_Type(type, T_FIXNUM);
+	if (strcmp("ELF::Elf32Rel", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rel, &rb_elf32rel_type, pRel);
+		pRel->r_info = (pRel->r_info & 0xFFFFFF00) | (NUM2INT(type) & 0x000000FF);
+	}
+	else if (strcmp("ELF::Elf32Rela", rb_obj_classname(self)) == 0)
+	{
+		TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+		pRela->r_info = (pRela->r_info & 0xFFFFFF00) | (NUM2INT(type) & 0x000000FF);
+	}
+	else
+	{
+		raise_exception(__FUNCTION__, __LINE__);
+	}
+	return self;
+}
+
+// =============================================================================
+// Elf32Rela Get r_addend
 // =============================================================================
 static VALUE elf32rela_get_r_addend(VALUE self)
 {
@@ -549,7 +672,7 @@ static VALUE elf32rela_get_r_addend(VALUE self)
 }
 
 // =============================================================================
-// Elf32Rela Set r_info
+// Elf32Rela Set r_addend
 // =============================================================================
 static VALUE elf32rela_set_r_addend(VALUE self, VALUE addend)
 {
@@ -559,7 +682,19 @@ static VALUE elf32rela_set_r_addend(VALUE self, VALUE addend)
 	pRela->r_addend = NUM2INT(addend);
 	return self;
 }
-
+// =============================================================================
+// Show reala table by readelf -r format
+// =============================================================================
+static VALUE elf32rela_show(VALUE self)
+{
+	// TODO ref table.
+	#if 0
+	Elf32_Rela *pRela;
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+	fprintf(stdout, " Offset     Info    Type            Sym.Value  Sym. Name + Addend\n");
+	#endif
+	return Qnil;
+}
 // =============================================================================
 // ELF32 data type
 // =============================================================================
@@ -590,12 +725,13 @@ static VALUE elf32_alloc(VALUE klass)
 // =============================================================================
 static void rb_elf32_free(void *ptr)
 {
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	ST_ELF32 *pElf32;
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 
-	ST_ELF32 *pElf32 = (ST_ELF32 *)ptr;
+	pElf32 = (ST_ELF32 *)ptr;
     elf32_munmapFile(pElf32, pElf32->length);
 	free(pElf32);
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return;
 }
 
@@ -615,7 +751,7 @@ static VALUE elf32_initialize(VALUE self, VALUE filepath)
 {
 	int ret;
 	ST_ELF32 *pElf32;
-	Check_Type( filepath, T_STRING );
+	Check_Type(filepath, T_STRING);
 
 	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pElf32);
 	ret = elf32_mmapFile(StringValuePtr(filepath), PROT_READ, MAP_PRIVATE, 0, (void *)&pElf32->pAddr, &pElf32->length);
@@ -648,9 +784,9 @@ static VALUE elf32_get_symtab(VALUE self)
 	uint32_t idx;
 	Elf32_Sym *pSymtab;
 	size_t size;
-	char *pSymtabName;
+	const char *pSymtabName;
 
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	#if 0
 	if (!NIL_P(name)) {
 		pSymtabName = ".symtab";
@@ -662,7 +798,7 @@ static VALUE elf32_get_symtab(VALUE self)
 
 	TypedData_Get_Struct(self, ST_ELF32, &rb_elf32_type, pSelf);
 	ary = rb_ary_new();
-	ret = elf32_searchShdr(pSelf->pAddr, pSymtabName, &pShdr, &idx);
+	ret = elf32_searchShdr(pSelf->pAddr, (char *)pSymtabName, &pShdr, &idx);
 	if (ret < 0) {
 		// TODO 
 		// Not Found
@@ -678,7 +814,7 @@ static VALUE elf32_get_symtab(VALUE self)
 		size -= sizeof(Elf32_Sym);
 	}
 
-	dbg_printf( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	return ary;
 }
 
@@ -689,13 +825,13 @@ static VALUE elf32_ary2symtab(VALUE self, VALUE ary)
 {
 	int i,len;
 	int count;
-	len = RARRAY_LEN(ary);
 	uint8_t *pBin;
 	Elf32_Sym *pSym;
 	VALUE symtab;
 
-	Check_Type( ary, T_ARRAY );
+	Check_Type(ary, T_ARRAY);
 
+	len = RARRAY_LEN(ary);
 	pBin = malloc(len);
 	for(i = 0; i < len; i++) {
 		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
@@ -717,13 +853,13 @@ static VALUE elf32_ary2symtab(VALUE self, VALUE ary)
 static VALUE elf32_ary2reltab(VALUE self, VALUE ary)
 {
 	int i,len, count;
-	len = RARRAY_LEN(ary);
 	uint8_t *pBin;
 	Elf32_Rel *pRel;
 	VALUE reltab;
 
-	Check_Type( ary, T_ARRAY );
+	Check_Type(ary, T_ARRAY);
 
+	len = RARRAY_LEN(ary);
 	pBin = malloc(len);
 	for(i = 0; i < len; i++) {
 		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
@@ -740,18 +876,19 @@ static VALUE elf32_ary2reltab(VALUE self, VALUE ary)
 }
 
 // =============================================================================
-// ELF32 Create Elf32_Rel Array from Array(Byte Array)
+// ELF32 Create Elf32_Rela Array from Array(Byte Array)
 // =============================================================================
 static VALUE elf32_ary2relatab(VALUE self, VALUE ary)
 {
 	int i,len, count;
-	len = RARRAY_LEN(ary);
 	uint8_t *pBin;
 	Elf32_Rela *pRela;
 	VALUE relatab;
 
-	Check_Type( ary, T_ARRAY );
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
+	Check_Type(ary, T_ARRAY);
 
+	len = RARRAY_LEN(ary);
 	pBin = malloc(len);
 	for(i = 0; i < len; i++) {
 		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
@@ -764,6 +901,7 @@ static VALUE elf32_ary2relatab(VALUE self, VALUE ary)
 		rb_ary_push(relatab, elf32rela_struct2obj(pRela));
 		pRela++;
 	}
+	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return relatab;
 }
 
@@ -801,6 +939,7 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32Sym, "st_other=", elf32sym_set_st_other, 1);
 	rb_define_method(rb_cElf32Sym, "st_shndx", elf32sym_get_st_shndx, 0);
 	rb_define_method(rb_cElf32Sym, "st_shndx=", elf32sym_set_st_shndx, 1);
+	rb_define_method(rb_cElf32Sym, "to_bin", elf32sym_to_bin, 0);
 
 	// Initialize rb_cElf32Rel
 	rb_cElf32Rel = rb_define_class_under(rb_elfModule, "Elf32Rel" , rb_cObject);
@@ -817,8 +956,13 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32Rela, "r_offset=", elf32rela_set_r_offset, 1);
 	rb_define_method(rb_cElf32Rela, "r_info", elf32rela_get_r_info, 0);
 	rb_define_method(rb_cElf32Rela, "r_info=", elf32rela_set_r_info, 1);
+	rb_define_method(rb_cElf32Rela, "symbol_idx", elf32rela_get_symbolIdx, 0);
+	rb_define_method(rb_cElf32Rela, "symbol_idx=", elf32rela_set_symbolIdx, 1);
+	rb_define_method(rb_cElf32Rela, "type", elf32rela_get_type, 0);
+	rb_define_method(rb_cElf32Rela, "type=", elf32rela_set_type, 1);
 	rb_define_method(rb_cElf32Rela, "r_addend", elf32rela_get_r_addend, 0);
 	rb_define_method(rb_cElf32Rela, "r_addend=", elf32rela_set_r_addend, 1);
+	rb_define_method(rb_cElf32Rela, "show", elf32rela_show, 0);
 	return;
 }
 

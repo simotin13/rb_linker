@@ -32,7 +32,6 @@ static int elf32_getSectionNameOffset(uint8_t *pAddr, const char *name, size_t *
 	uint8_t *pStr;
 	size_t offset;
 	offset = 0;
-	fprintf( stderr, "%s %d %s %s\n", __FILE__, __LINE__, __FUNCTION__, "In..." );
 
 	pStr = elf32_getStrTab(pAddr, &size);
 	printf("size:%zu\n", size);
@@ -48,7 +47,6 @@ static int elf32_getSectionNameOffset(uint8_t *pAddr, const char *name, size_t *
 		pStr += (sLen + 1);
 		offset += (sLen + 1);
 	}
-	fprintf( stderr, "%s %d %s %s\n", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return -1;
 }
 
@@ -61,7 +59,6 @@ int elf32_searchShdr(uint8_t *pAddr, char *name, Elf32_Shdr **pShdr, uint32_t *p
 	size_t offset;
 	pEhdr = (Elf32_Ehdr *)pAddr;
 
-	fprintf( stderr, "%s %d %s %s\n", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	ret = elf32_getSectionNameOffset(pAddr, name, &offset);
 	if (ret < 0)
 	{
