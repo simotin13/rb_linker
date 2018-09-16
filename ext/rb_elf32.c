@@ -44,6 +44,7 @@ static VALUE elf32sym_set_st_other(VALUE self, VALUE other);
 static VALUE elf32sym_get_st_shndx(VALUE self);
 static VALUE elf32sym_set_st_shndx(VALUE self, VALUE shndx);
 static VALUE elf32sym_to_bin(VALUE self);
+static VALUE elf32sym_has_ref(VALUE self);
 
 // =============================================================================
 // Elf32Rel
@@ -89,6 +90,7 @@ static VALUE elf32_initialize(VALUE self, VALUE filepath);
 static VALUE elf32_show_Ehdr(VALUE self);
 static VALUE elf32_get_symtab(VALUE self);
 static VALUE elf32_ary2symtab(VALUE self, VALUE ary);
+static VALUE elf32_symtab2ary(VALUE self, VALUE symtab);
 static VALUE elf32_ary2reltab(VALUE self, VALUE ary);
 static VALUE elf32_ary2relatab(VALUE self, VALUE ary);
 
@@ -389,6 +391,34 @@ static VALUE elf32sym_to_bin(VALUE self)
 	return ary;
 }
 
+// =============================================================================
+// Elf32Sym Check symbol has reference section index.
+// =============================================================================
+static VALUE elf32sym_has_ref(VALUE self)
+{
+	Elf32_Sym *pSym;
+	TypedData_Get_Struct(self, Elf32_Sym, &rb_elf32sym_type, pSym);
+	switch(pSym->st_shndx)
+	{
+	case SHN_UNDEF:
+	case SHN_LORESERVE:
+	// case SHN_LOPROC: same as SHN_LORESERVE
+	// case SHN_BEFORE: same as SHN_LORESERVE
+	case SHN_AFTER:
+	case SHN_HIPROC:
+	case SHN_LOOS:
+	case SHN_HIOS:
+	case SHN_ABS:
+	case SHN_COMMON:
+	case SHN_XINDEX:
+	// case SHN_HIRESERVE: same as SHN_XINDEX
+		return Qfalse;
+	default:
+		return Qtrue;
+	}
+
+	return Qtrue;
+}
 // =============================================================================
 // Elf32Rel type info
 // =============================================================================
@@ -912,6 +942,29 @@ static VALUE elf32_ary2symtab(VALUE self, VALUE ary)
 	}
 	return symtab;
 }
+// =============================================================================
+// ELF32 Create Byte Array from Symbol Table(Elf32_Sym Array)
+// =============================================================================
+static VALUE elf32_symtab2ary(VALUE self, VALUE symtab)
+{
+	size_t i, j, len;
+	uint8_t *pBin;
+	Elf32_Sym *pSym;
+	VALUE ary_bin;
+
+	Check_Type(symtab, T_ARRAY);
+	len = RARRAY_LEN(symtab);
+	ary_bin = rb_ary_new();
+
+	for(i = 0; i < len; i++) {
+		TypedData_Get_Struct(rb_ary_entry(symtab, i), Elf32_Sym, &rb_elf32sym_type, pSym);
+		pBin = (uint8_t *)pSym;
+		for (j = 0; j < sizeof(Elf32_Sym); j++) {
+			rb_ary_push(ary_bin, INT2FIX(pBin[j]));
+		}
+	}
+	return ary_bin;
+}
 
 // =============================================================================
 // ELF32 Create Elf32_Rel Array from Array(Byte Array)
@@ -1012,6 +1065,7 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32, "show_Ehdr", elf32_show_Ehdr, 0);
 	rb_define_method(rb_cElf32, "symtab", elf32_get_symtab, 0);
 	rb_define_singleton_method( rb_cElf32, "to_symtab", elf32_ary2symtab, 1);
+	rb_define_singleton_method( rb_cElf32, "symtab_to_bin", elf32_symtab2ary, 1);
 	rb_define_singleton_method( rb_cElf32, "to_reltab", elf32_ary2reltab, 1);
 	rb_define_singleton_method( rb_cElf32, "to_relatab", elf32_ary2relatab, 1);
 
@@ -1036,6 +1090,7 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32Sym, "st_shndx", elf32sym_get_st_shndx, 0);
 	rb_define_method(rb_cElf32Sym, "st_shndx=", elf32sym_set_st_shndx, 1);
 	rb_define_method(rb_cElf32Sym, "to_bin", elf32sym_to_bin, 0);
+	rb_define_method(rb_cElf32Sym, "has_ref_section?", elf32sym_has_ref, 0);
 
 	// Initialize rb_cElf32Rel
 	rb_cElf32Rel = rb_define_class_under(rb_elfModule, "Elf32Rel" , rb_cObject);
