@@ -1,4 +1,4 @@
-#!/usr/bin/ruby
+#!/usr/local/bin/ruby
 $LOAD_PATH.push("./")
 $LOAD_PATH.push("./ELF")
 require "elf"
