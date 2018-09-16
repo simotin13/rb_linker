@@ -369,69 +369,6 @@ module ELF
 			linked_section_map[".symtab"][:bin] = Elf32.symtab_to_bin(symtab)
 
 			# ========================================================================
-			# プログラムヘッダの作成
-			# ========================================================================
-			prog_headers = []
-			link_options[:addr_map].each do |section_addr, section_names|
-				section_names.each do |section_name|
-					section_info = linked_section_map[section_name][:section_info]
-					program_h_info = {}
-					# LOAD固定
-					program_h_info[:p_type]   = ELF_PT_LOAD
-
-					# セクションオフセット位置
-					prog_offset = 0
-					prog_offset = ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_options[:addr_sections_num])
-
-					# セクションのオフセット位置を計算
-					linked_section_map.each_pair do |name, section|
-						break if section_name == name
-						prog_offset += section[:bin].size
-					end
-
-					if section_info[:type] == SH_TYPE_NOBITS
-						prog_offset = 0
-					end
-					program_h_info[:p_offset] = prog_offset
-
-					# とりあえずROM/RAM展開はなし
-					program_h_info[:p_vaddr]  = section_info[:va_address]
-					program_h_info[:p_paddr]  = section_info[:offset]
-					program_h_info[:p_filesz] = section_info[:size]
-					program_h_info[:p_memsz]  = section_info[:size]
-
-					# セグメントの属性を設定
-					flg_val = ELF_PF_R
-					flag = section_info[:flags]
-					if (flag & ELF_FLG_EXECUTE) != 0
-						flg_val += ELF_PF_X
-					end
-					if (flag & ELF_FLG_WRITE) != 0
-						flg_val += ELF_PF_W
-					end
-
-					program_h_info[:p_flags]  = flg_val
-					program_h_info[:p_align]  = section_info[:addr_align]
-					prog_headers << program_h_info
-				end
-			end
-
-			# ELF header
-			linked_header = objs.first
-			# 実行形式として出力する
-			linked_header.elf_type = ELF_ET_EXEC
-			linked_header.elf_entry = 0xFFF00000
-			linked_header.elf_flags = 0x00
-
-			# プログラムヘッダ出力情報
-			prog_h_offset = ELF_SIZE_ELF32_HEADER
-			linked_header.elf_program_h_offset = prog_h_offset
-			prog_h_size = ELF_SIZE_ELF32_PROG_HEADER
-			linked_header.elf_program_h_size = ELF_SIZE_ELF32_PROG_HEADER
-			linked_header.elf_program_h_num = prog_headers.length
-			linked_header.elf_section_name_idx = linked_section_map[".shstrtab"][:section_info][:idx]
-
-			# ========================================================================
 			# リロケーションの更新
 			# ========================================================================
 			rel_secions = {}
@@ -501,6 +438,70 @@ module ELF
 			rela_section_names.each do |rela_section_name|
 				linked_section_map.delete(rela_section_name)
 			end
+
+			# ========================================================================
+			# プログラムヘッダの作成
+			# ========================================================================
+			prog_headers = []
+			link_options[:addr_map].each do |section_addr, section_names|
+				section_names.each do |section_name|
+					section_info = linked_section_map[section_name][:section_info]
+					program_h_info = {}
+					# LOAD固定
+					program_h_info[:p_type]   = ELF_PT_LOAD
+
+					# セクションオフセット位置
+					prog_offset = 0
+					prog_offset = ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_options[:addr_sections_num])
+
+					# セクションのオフセット位置を計算
+					linked_section_map.each_pair do |name, section|
+						break if section_name == name
+						puts "name:#{name} prog_offset:#{prog_offset.to_h}, size:#{section[:bin].size.to_h}"
+						prog_offset += section[:bin].size
+					end
+
+					if section_info[:type] == SH_TYPE_NOBITS
+						prog_offset = 0
+					end
+					program_h_info[:p_offset] = prog_offset
+
+					# とりあえずROM/RAM展開はなし
+					program_h_info[:p_vaddr]  = section_info[:va_address]
+					program_h_info[:p_paddr]  = section_info[:va_address]
+					program_h_info[:p_filesz] = section_info[:size]
+					program_h_info[:p_memsz]  = section_info[:size]
+
+					# セグメントの属性を設定
+					flg_val = ELF_PF_R
+					flag = section_info[:flags]
+					if (flag & ELF_FLG_EXECUTE) != 0
+						flg_val += ELF_PF_X
+					end
+					if (flag & ELF_FLG_WRITE) != 0
+						flg_val += ELF_PF_W
+					end
+
+					program_h_info[:p_flags]  = flg_val
+					program_h_info[:p_align]  = section_info[:addr_align]
+					prog_headers << program_h_info
+				end
+			end
+
+			# ELF header
+			linked_header = objs.first
+			# 実行形式として出力する
+			linked_header.elf_type = ELF_ET_EXEC
+			linked_header.elf_entry = 0xFFF00000
+			linked_header.elf_flags = 0x00
+
+			# プログラムヘッダ出力情報
+			prog_h_offset = ELF_SIZE_ELF32_HEADER
+			linked_header.elf_program_h_offset = prog_h_offset
+			prog_h_size = ELF_SIZE_ELF32_PROG_HEADER
+			linked_header.elf_program_h_size = ELF_SIZE_ELF32_PROG_HEADER
+			linked_header.elf_program_h_num = prog_headers.length
+			linked_header.elf_section_name_idx = linked_section_map[".shstrtab"][:section_info][:idx]
 
 			# ========================================================================
 			# セクションヘッダ出力オフセット計算
