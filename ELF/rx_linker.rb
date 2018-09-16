@@ -27,6 +27,28 @@ module ELF
 	    true
 	  end
 
+		# .rela セクションの情報を更新する
+		def update_rela_sections section_name, rela_section, section_name_offset_map
+			# 現在のオブジェクトファイルの.relaPResetPRG を取得しクラスに変換
+			bin = rela_section[section_name][:bin]
+			relatab = Elf32.to_relatab(bin)
+
+			# 各リロケーション情報の以下の内容を更新する
+			#  r_offset(再配置先オフセット) 再配置により値を埋め込むセクションでのオフセット
+			#  synbol idx(higher 24 bit of r_info) relocation symbol index of .symtab
+			rel_bin = []
+			relatab.each do |rela|
+				# PResetPRGセクションの現在のオフセットを参照
+				# .rela を切り取り
+				target_section_name = section_name.slice(5..-1)
+				puts "target_section_name:#{target_section_name}"
+				target_cur_offset = section_name_offset_map[target_section_name]
+				rela.r_offset += target_cur_offset
+				rel_bin.concat(rela.to_bin)
+			end
+			rel_bin
+		end
+
 	  # .clnkファイルの内容を取得する
 	  def get_options clnk_file
 
@@ -87,7 +109,9 @@ module ELF
 			objs = []
 			elf_class = nil
 			link_options = get_options(clnk_file)
+			puts "******** link_options ********"
 			puts link_options
+			puts "************************"
 
 			# 同一クラスかどうかチェック
 			puts "Input object files #{link_options[:input]}"
@@ -104,12 +128,10 @@ module ELF
 	    check_elf_header(objs)
 
 			linked_section_map = {}
-			symbols = []
 
 			# ========================================================================
 			# 各オブジェクトファイル毎にリンク処理を行う
 			# ========================================================================
-			rel_secions = {}
 			linked_sh_name_offset_map = {}
 			objs.each do |elf_object|
 
@@ -120,10 +142,6 @@ module ELF
 				#elf_object.delete_section_info("$iop") if elf_object.has_section?("$iop")
 				#elf_object.delete_section_info(".relaPResetPRG") if elf_object.has_section?(".relaPResetPRG")
 				#elf_object.delete_section_info(".relaFIXEDVECT") if elf_object.has_section?(".relaFIXEDVECT")
-				symbols.concat(elf_object.symbol_table)
-
-				# リロケーションの情報を保持しておく
-				rel_secions = elf_object.rel_sections
 
 				# 同一のセクションのデータをまとめる
 				sh_idx = 0
@@ -149,11 +167,13 @@ module ELF
 						rela_bin = elf_object.get_section_data(section_name)
 						tmp_rela_section_info[section_name] = {section_info: section_info, bin: rela_bin}
 						# PResetPRGセクションのオフセット
+						puts "skip .relaPResetPRG..."
 						next
 					end
 					if section_name == ".relaFIXEDVECT"
 						rela_bin = elf_object.get_section_data(section_name)
 						tmp_rela_section_info = {section_info: section_info, bin: rela_bin}
+						puts "skip .relaFIXEDVECT..."
 						next
 					end
 
@@ -164,13 +184,6 @@ module ELF
 						next	# .symtabは後回しにして次のセクションへ
 					end
 
-					# セクションサイズ分オフセットを更新(実体のない(SH_TYPE_NOBITS)セクションは更新不要)
-					if section_info[:type] == SH_TYPE_NOBITS
-						# TODO 要確認 SH_TYPE_NOBITSを考慮しなくてよい？
-						puts "#{section_name} is NOBITS"
-						next
-					end
-
 					# セクション情報の初期化
  					if linked_section_map[section_name].nil?
  						# 初めて登場する → リンクするセクションマップに登録
@@ -178,6 +191,13 @@ module ELF
 					else
 						# 既に登録されているセクション → サイズ情報を更新
 						linked_section_map[section_name][:section_info][:size] += section_info[:size]
+					end
+
+					# セクションサイズ分オフセットを更新(実体のない(SH_TYPE_NOBITS)セクションは更新不要)
+					if section_info[:type] == SH_TYPE_NOBITS
+						# TODO 要確認 SH_TYPE_NOBITSを考慮しなくてよい？
+						puts "#{section_name} is NOBITS"
+						next
 					end
 
 					# セクションの実態を取得し結合する
@@ -191,9 +211,7 @@ module ELF
 					# DEBUG セクション情報とセクション実体のサイズが一致しているか確認
 					# 一致しない場合もあり得る？
 					unless linked_section_map[section_name][:bin].size == linked_section_map[section_name][:section_info][:size]
-						puts section_name
-						puts linked_section_map[section_name][:section_info][:type]
-						puts "bin:#{linked_section_map[section_name][:bin].size.to_h}, info:#{linked_section_map[section_name][:section_info][:size].to_h}"
+						puts "section_name:#{section_name}, bin:#{linked_section_map[section_name][:bin].size.to_h}, info:#{linked_section_map[section_name][:section_info][:size].to_h}"
 						throw "Link secion size not match!"
 					end
 
@@ -202,12 +220,9 @@ module ELF
 
 				# TODO 更新した シンボルテーブルの結合の次フェーズでの活用
 				if linked_section_map[".symtab"].nil?
-					puts "first time.."
-					puts cur_section_name_size_map
 					# 最初のオブジェクト → 参照情報の更新不要
 					linked_section_map[".symtab"] = tmp_symtab_info
 				else
-					puts "second time..."
 					cur_symtab = Elf32.to_symtab(linked_section_map[".symtab"][:bin])
 
 					# 2オブジェクト目以降のシンボルテーブル →オフセット位置などの更新を行う
@@ -219,27 +234,20 @@ module ELF
 						# シンボルテーブルが参照するセクション名を取得
 						case sym.st_shndx
 						when SHN_LORESERVE, SHN_LOPROC, SHN_BEFORE, SHN_AFTER, SHN_HIPROC, SHN_LOOS, SHN_HIOS, SHN_ABS, SHN_COMMON, SHN_XINDEX, SHN_HIRESERVE
-							puts "special case.."
 							next
 						else
-							puts cur_section_idx_name_map
-							puts "sym.st_shndx:#{sym.st_shndx.to_h}"
+							# 参照するセクション名を取得
 							ref_section_name = cur_section_idx_name_map[sym.st_shndx]
 						end
 
 						if sym.type == STT_NOTYPE
-							puts "notype"
+							# 空のシンボル対応
 							next
 						end
 
 						# 該当するセクションのオフセット位置を取得
 						# これまでに結合したセクションの合計サイズが、
 						# 次に結合するセクションのオフセット位置になる
-						puts sym.show
-						puts cur_section_idx_name_map
-						sym.st_value += linked_sh_name_offset_map[ref_section_name]
-						puts "ffffffffffffffffffff"
-						puts linked_section_map[ref_section_name]
 
 						# 参照するセクションインデックスの更新
 						# TODO ここでしない方がよい？
@@ -254,15 +262,16 @@ module ELF
 				# ==================================================
 				# リロケーションテーブル更新
 				# ==================================================
-				unless tmp_rela_section_info[".relaPResetPRG"].nil?
-					rela_p_reset = tmp_rela_section_info[".relaPResetPRG"][:bin]
-					relatab = Elf32.to_relatab(rela_p_reset)
-					relatab.each do |rela|
-						# PResetPRGセクションの現在のオフセットを参照
-						rela.r_offset += linked_sh_name_offset_map
-						# 再配置を行うシンボルインデックスの更新
-						# TODO ここでしない方がよい？
-						sym.st_shndx = linked_section_map[section_name][:section_info][:idx]
+				rela_section_names =[".relaPResetPRG", ".relaFIXEDVECT"]
+				rela_section_names.each do |rela_secion_name|
+					unless tmp_rela_section_info[rela_secion_name].nil?
+						rela_PResetPRG = update_rela_sections(rela_secion_name, tmp_rela_section_info, linked_sh_name_offset_map)
+						if linked_section_map[rela_secion_name].nil?
+							# relaPResetPRGが最初に出てきた場合
+							linked_section_map[rela_secion_name] = {section_info: tmp_rela_section_info[rela_secion_name][:section_info], bin: []}
+						end
+						# relaPResetPRGの更新
+						linked_section_map[rela_secion_name][:bin].concat(rela_PResetPRG)
 					end
 				end
 
@@ -364,21 +373,30 @@ module ELF
 			# ========================================================================
 			# リロケーションの更新
 			# ========================================================================
+			rel_secions = {}
+			relatab = Elf32.to_relatab(linked_section_map[".relaPResetPRG"][:bin])
+
+			rel_secions[".relaPResetPRG"] = relatab
+			symbols = Elf32.to_symtab(linked_section_map[".symtab"][:bin])
+
+			# TODO relaFIXEDVECT
+			#linked_section_map["relaFIXEDVECT"]
+
 			rel_calc_stack = []
-			rel_secions.each do |name, rel_section|
-				rel_section.each do |rel_info|
-					sym_info = symbols[rel_info[:symbol_idx]]
+			rel_secions.each do |name, reltab|
+				reltab.each do |rel_info|
+					sym_info = symbols[rel_info.symbol_idx]
 					target_section_name = name.slice(5..-1)
 					target_section = linked_section_map[target_section_name]
 
-					case rel_info[:type]
+					case rel_info.type
 					when R_RX_DIR32
 						# 4byte のアドレスを書き換え
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
 						ref_addr = ref_section[1][:section_info][:va_address]
 						ref_addr += sym_info[:st_value]
 						bytes = ref_addr.to_bin32_ary(true)
-						offset = rel_info[:offset]
+						offset = rel_info.offset
 						target_section[:bin][offset + 0] = bytes[0]
 						target_section[:bin][offset + 1] = bytes[1]
 						target_section[:bin][offset + 2] = bytes[2]
@@ -392,10 +410,10 @@ module ELF
 						target_section[:bin][offset + 2] = bytes[2]
 						target_section[:bin][offset + 3] = bytes[3]
 					when R_RX_OPscttop
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
 						rel_calc_stack << ref_section[1][:section_info][:va_address]
 					when R_RX_OPsctsize
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info[:st_shidx]}
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
 						rel_calc_stack << ref_section[1][:section_info][:size]
 					when R_RX_OPadd
 						arg1 = rel_calc_stack.pop
@@ -403,10 +421,10 @@ module ELF
 						val = arg1 + arg2
 						rel_calc_stack << val
 					when R_RX_DIR8S_PCREL
-						rel_addr = rel_info[:r_addend] - rel_info[:offset] + 1
-						target_section[:bin][rel_info[:offset]] = rel_addr
+						rel_addr = rel_info.r_addend - rel_info.r_offset + 1
+						target_section[:bin][rel_info.r_offset] = rel_addr
 					else
-						throw "Unexpected rel type, #{rel_info[:type].to_h}"
+						throw "Unexpected rel type, #{rel_info.type.to_h}"
 					end
 				end
 			end
