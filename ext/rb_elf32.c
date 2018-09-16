@@ -77,6 +77,7 @@ static VALUE elf32rela_set_symbolIdx(VALUE self, VALUE new_idx);
 static VALUE elf32rela_get_type(VALUE self);
 static VALUE elf32rela_set_type(VALUE self, VALUE type);
 static VALUE elf32rela_show(VALUE self);
+static VALUE elf32rela_to_bin(VALUE self);
 
 // =============================================================================
 // Elf32
@@ -370,7 +371,7 @@ static VALUE elf32sym_set_st_shndx(VALUE self, VALUE shndx)
 }
 
 // =============================================================================
-// Elf32Sym Convert to binary
+// Elf32Sym Convert to binary(Array)
 // =============================================================================
 static VALUE elf32sym_to_bin(VALUE self)
 {
@@ -536,9 +537,7 @@ static VALUE rb_elf32rela_new(void)
 // =============================================================================
 static void rb_elf32rela_free(void *ptr)
 {
-	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	free(ptr);
-	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return;
 }
 
@@ -728,6 +727,7 @@ static VALUE elf32rela_set_r_addend(VALUE self, VALUE addend)
 	pRela->r_addend = NUM2INT(addend);
 	return self;
 }
+
 // =============================================================================
 // Show reala table by readelf -r format
 // =============================================================================
@@ -741,6 +741,26 @@ static VALUE elf32rela_show(VALUE self)
 	#endif
 	return Qnil;
 }
+
+// =============================================================================
+// Elf32Rela Convert to binary(Array)
+// =============================================================================
+static VALUE elf32rela_to_bin(VALUE self)
+{
+	size_t i;
+	Elf32_Rela *pRela;
+	uint8_t *pBin;
+	VALUE ary;
+	TypedData_Get_Struct(self, Elf32_Rela, &rb_elf32rela_type, pRela);
+
+	ary = rb_ary_new();
+	pBin = (uint8_t *)pRela;
+	for(i = 0; i < sizeof(Elf32_Rela); i++) {
+		rb_ary_push(ary, INT2FIX(pBin[i]));
+	}
+	return ary;
+}
+
 // =============================================================================
 // ELF32 data type
 // =============================================================================
@@ -931,9 +951,7 @@ static VALUE elf32_ary2relatab(VALUE self, VALUE ary)
 	Elf32_Rela *pRela;
 	VALUE relatab;
 
-	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "In..." );
 	Check_Type(ary, T_ARRAY);
-
 	len = RARRAY_LEN(ary);
 	pBin = malloc(len);
 	for(i = 0; i < len; i++) {
@@ -947,7 +965,6 @@ static VALUE elf32_ary2relatab(VALUE self, VALUE ary)
 		rb_ary_push(relatab, elf32rela_struct2obj(pRela));
 		pRela++;
 	}
-	dbg_puts( "%s:%d %s %s", __FILE__, __LINE__, __FUNCTION__, "Out..." );
 	return relatab;
 }
 
@@ -1042,20 +1059,6 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32Rela, "r_addend", elf32rela_get_r_addend, 0);
 	rb_define_method(rb_cElf32Rela, "r_addend=", elf32rela_set_r_addend, 1);
 	rb_define_method(rb_cElf32Rela, "show", elf32rela_show, 0);
+	rb_define_method(rb_cElf32Rela, "to_bin", elf32rela_to_bin, 0);
 	return;
 }
-
-// 実装方針
-// とりあえずシンボルテーブルを全部くっつける
-// タイプを気にせず関連する文字列をコピー
-// →.strtabセクション内でのオフセットは更新する必要がある
-// →先に.strtabを結合し、オブジェクトのオフセット値を保持しておく
-// .symtabを最後に結合し、オフセット値を足して文字列位置を補正する
-// シンボルが必要になる理由
-// リロケーションの時にシンボルテーブルのインデックスで指定されるので
-// 結合できていないとリロケーションができない
-// 順番
-// .strtabのマージ→オブジェクト全体を更新する
-
-
-// オブジェクト単位でオフセットを保持し、セクション内のオフセットを更新する。
