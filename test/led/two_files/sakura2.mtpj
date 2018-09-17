@@ -672,8 +672,6 @@ D_2=R_2
       <LinkOptionOtherAdditionalOptionsForConvertFile-DefaultValue />
       <HexOptionCommandLine-DefaultValue>-end
 -input=%BuildModeName%\%ProjectName%.abs
--form=stype
--output=%BuildModeName%\%ProjectName%.mot
 -exit
 </HexOptionCommandLine-DefaultValue>
       <LinkOptionCrcCalculationRange-DefaultValue />
@@ -1834,7 +1832,7 @@ D_2=R_2
       <DebuggerProperty-DownloadProperty-DebugInformation-FlashErase>True</DebuggerProperty-DownloadProperty-DebugInformation-FlashErase>
       <DebuggerProperty-DownloadProperty-DebugInformation-DataFlashErase>False</DebuggerProperty-DownloadProperty-DebugInformation-DataFlashErase>
       <DebuggerProperty-DownloadProperty-DebugInformation-EventCorrection>SuspendEvent</DebuggerProperty-DownloadProperty-DebugInformation-EventCorrection>
-      <DebuggerProperty-DownloadProperty-DebugInformation-SkipStartup>True</DebuggerProperty-DownloadProperty-DebugInformation-SkipStartup>
+      <DebuggerProperty-DownloadProperty-DebugInformation-SkipStartup>False</DebuggerProperty-DownloadProperty-DebugInformation-SkipStartup>
       <DebuggerProperty-DownloadProperty-DebugInformation-MainSymbol>XwBtAGEAaQBuAA==</DebuggerProperty-DownloadProperty-DebugInformation-MainSymbol>
       <DebuggerProperty-DownloadProperty-DebugInformation-MaxLoaderMemorySize>500</DebuggerProperty-DownloadProperty-DebugInformation-MaxLoaderMemorySize>
       <DebuggerProperty-DownloadProperty-None-DefaultDownloadItemSupported>True</DebuggerProperty-DownloadProperty-None-DefaultDownloadItemSupported>
@@ -2115,16 +2113,6 @@ D_2=R_2
       <DebuggerProperty-HookProperty-HookTransaction-Connected-Length>0</DebuggerProperty-HookProperty-HookTransaction-Connected-Length>
       <DebuggerProperty-HookProperty-HookTransaction-Disconnecting-Length>0</DebuggerProperty-HookProperty-HookTransaction-Disconnecting-Length>
       <DebuggerProperty-EssentialProperty-EmulatorConnect-SerialNumber />
-      <DebuggerProperty-DownloadProperty-DebugInformation-DownloadFiles-DownloadItem0-UsePicPirodPidOffset>False</DebuggerProperty-DownloadProperty-DebugInformation-DownloadFiles-DownloadItem0-UsePicPirodPidOffset>
-      <DebuggerProperty-DownloadProperty-DebugInformation-DownloadFiles-DownloadItem0-PirodOffset>0</DebuggerProperty-DownloadProperty-DebugInformation-DownloadFiles-DownloadItem0-PirodOffset>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem0-IsUse>False</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem0-IsUse>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem0-InputSignal>RisingEdge</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem0-InputSignal>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem1-IsUse>False</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem1-IsUse>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem1-InputSignal>RisingEdge</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerInputItemList-ExternalTriggerInputItem1-InputSignal>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem0-IsUse>False</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem0-IsUse>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem0-PulseWidth>1</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem0-PulseWidth>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem1-IsUse>False</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem1-IsUse>
-      <DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem1-PulseWidth>1</DebuggerProperty-OptionalProperty-ExpansionInterface-ExternalTriggerOutputItemList-ExternalTriggerOutputItem1-PulseWidth>
     </Instance>
   </Class>
   <Class Guid="100f3761-3d7e-4559-b1d8-375a0c7bf682">
