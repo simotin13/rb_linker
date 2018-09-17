@@ -24,7 +24,7 @@ module ELF
 		R_RX_OPscttop  		= 0x8D
 
 	  def check_elf_header objs
-	    # check ELF Header of each objects
+	    # TODO check ELF Header of each objects
 	    true
 	  end
 
@@ -47,6 +47,132 @@ module ELF
 				rel_bin.concat(rela.to_bin)
 			end
 			rel_bin
+		end
+
+		# ==========================================================================
+		# make program header
+		# ==========================================================================
+		def make_program_header link_options, linked_section_map
+			prog_headers = []
+			link_options[:addr_map].each do |section_addr, section_names|
+				section_names.each do |section_name|
+					section_info = linked_section_map[section_name][:section_info]
+					program_h_info = {}
+					# LOAD固定
+					program_h_info[:p_type]   = ELF_PT_LOAD
+
+					# セクションオフセット位置
+					prog_offset = 0
+					prog_offset = ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_options[:addr_sections_num])
+
+					# セクションのオフセット位置を計算
+					linked_section_map.each_pair do |name, section|
+						break if section_name == name
+						prog_offset += section[:bin].size
+					end
+
+					if section_info[:type] == SH_TYPE_NOBITS
+						prog_offset = 0
+					end
+					program_h_info[:p_offset] = prog_offset
+
+					# とりあえずROM/RAM展開はなし
+					program_h_info[:p_vaddr]  = section_info[:va_address]
+					program_h_info[:p_paddr]  = section_info[:va_address]
+					program_h_info[:p_filesz] = section_info[:size]
+					program_h_info[:p_memsz]  = section_info[:size]
+
+					# セグメントの属性を設定
+					flg_val = ELF_PF_R
+					flag = section_info[:flags]
+					if (flag & ELF_FLG_EXECUTE) != 0
+						flg_val += ELF_PF_X
+					end
+					if (flag & ELF_FLG_WRITE) != 0
+						flg_val += ELF_PF_W
+					end
+
+					program_h_info[:p_flags]  = flg_val
+					program_h_info[:p_align]  = section_info[:addr_align]
+					prog_headers << program_h_info
+				end
+			end
+			prog_headers
+		end
+
+		# ==========================================================================
+		# relocate rela sections
+		# ==========================================================================
+		def relocate_rela_sections rela_section_names, linked_section_map
+			rel_secions = {}
+			rela_section_names.each do |rela_section_name|
+				rel_secions[rela_section_name] = Elf32.to_relatab(linked_section_map[rela_section_name][:bin])
+			end
+
+			symtab = Elf32.to_symtab(linked_section_map[".symtab"][:bin])
+			rel_calc_stack = []
+			rel_secions.each do |name, reltab|
+				reltab.each do |rel_info|
+					sym_info = symtab[rel_info.symbol_idx]
+					target_section_name = name.slice(5..-1)
+					target_section = linked_section_map[target_section_name]
+					case rel_info.type
+					when R_RX_DIR32
+						# 4byte のアドレスを書き換え
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
+						ref_addr = ref_section[1][:section_info][:va_address]
+						ref_addr += sym_info.st_value
+						bytes = ref_addr.to_bin32_ary(true)
+						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
+						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
+						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
+						target_section[:bin][rel_info.r_offset + 3] = bytes[3]
+					when R_RX_ABS32
+						val = rel_calc_stack.pop
+						bytes = val.to_bin32_ary(true)
+						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
+						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
+						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
+						target_section[:bin][rel_info.r_offset + 3] = bytes[3]
+					when R_RX_OPscttop
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
+						rel_calc_stack << ref_section[1][:section_info][:va_address]
+					when R_RX_OPsctsize
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
+						rel_calc_stack << ref_section[1][:section_info][:size]
+					when R_RX_OPadd
+						arg1 = rel_calc_stack.pop
+						arg2 = rel_calc_stack.pop
+						val = arg1 + arg2
+						rel_calc_stack << val
+					when R_RX_DIR8S_PCREL
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
+						ref_section_name = ref_section[0]
+						target_addr = target_section[:section_info][:va_address] + rel_info.r_offset
+						ref_addr = ref_section[1][:section_info][:va_address] + sym_info.st_value
+
+						# plus 1byte for opecode
+						rel_addr = rel_info.r_addend + ref_addr - target_addr + 1
+						bytes = rel_addr.to_bin32_ary(true)
+						target_section[:bin][rel_info.r_offset + 0] = rel_addr
+					when R_RX_DIR24S_PCREL
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
+						ref_section_name = ref_section[0]
+						target_addr = target_section[:section_info][:va_address] + rel_info.r_offset
+						ref_addr = ref_section[1][:section_info][:va_address] + sym_info.st_value
+
+						# plus 1byte for opecode
+						rel_addr = rel_info.r_addend + ref_addr - target_addr + 1
+
+						bytes = rel_addr.to_bin32_ary(true)
+						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
+						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
+						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
+					else
+						throw "Unexpected rel type, #{rel_info.type.to_h}"
+					end
+				end
+			end
 		end
 
 	  # .clnkファイルの内容を取得する
@@ -255,15 +381,6 @@ module ELF
 							next
 						end
 
-						# 該当するセクションのオフセット位置を取得
-						# これまでに結合したセクションの合計サイズが、
-						# 次に結合するセクションのオフセット位置になる
-
-						# 参照するセクションインデックスの更新
-						# TODO ここでしない方がよい？
-						# →この段階では linked_section_mapは確定していない
-						#sym.st_shndx = linked_section_map[section_name][:section_info][:idx]
-
 						# シンボル情報をテーブルに追加
 						linked_section_map[".symtab"][:bin].concat(sym.to_bin)
 					end
@@ -369,79 +486,8 @@ module ELF
 			# シンボルテーブル更新結果を上書き
 			linked_section_map[".symtab"][:bin] = Elf32.symtab_to_bin(symtab)
 
-			# ========================================================================
-			# リロケーションの更新
-			# ========================================================================
-			rel_secions = {}
-			rela_section_names.each do |rela_section_name|
-				rel_secions[rela_section_name] = Elf32.to_relatab(linked_section_map[rela_section_name][:bin])
-			end
-
-			rel_calc_stack = []
-			rel_secions.each do |name, reltab|
-				reltab.each do |rel_info|
-					sym_info = symtab[rel_info.symbol_idx]
-					target_section_name = name.slice(5..-1)
-					target_section = linked_section_map[target_section_name]
-					case rel_info.type
-					when R_RX_DIR32
-						# 4byte のアドレスを書き換え
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
-						ref_addr = ref_section[1][:section_info][:va_address]
-						ref_addr += sym_info.st_value
-						bytes = ref_addr.to_bin32_ary(true)
-						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
-						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
-						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
-						target_section[:bin][rel_info.r_offset + 3] = bytes[3]
-					when R_RX_ABS32
-						val = rel_calc_stack.pop
-						bytes = val.to_bin32_ary(true)
-						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
-						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
-						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
-						target_section[:bin][rel_info.r_offset + 3] = bytes[3]
-					when R_RX_OPscttop
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
-						rel_calc_stack << ref_section[1][:section_info][:va_address]
-					when R_RX_OPsctsize
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
-						rel_calc_stack << ref_section[1][:section_info][:size]
-					when R_RX_OPadd
-						arg1 = rel_calc_stack.pop
-						arg2 = rel_calc_stack.pop
-						val = arg1 + arg2
-						rel_calc_stack << val
-					when R_RX_DIR8S_PCREL
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
-						ref_section_name = ref_section[0]
-						target_addr = target_section[:section_info][:va_address] + rel_info.r_offset
-						ref_addr = ref_section[1][:section_info][:va_address] + sym_info.st_value
-						# plus 1byte for opecode
-						rel_addr = rel_info.r_addend + ref_addr - target_addr + 1
-						bytes = rel_addr.to_bin32_ary(true)
-						puts "rel_addr:#{rel_addr.to_h}"
-						target_section[:bin][rel_info.r_offset + 0] = rel_addr
-						# plus 1byte for opecode
-						#rel_addr = rel_info.r_addend - rel_info.r_offset + 1
-						#target_section[:bin][rel_info.r_offset] = rel_addr
-					when R_RX_DIR24S_PCREL
-						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
-						ref_section_name = ref_section[0]
-						target_addr = target_section[:section_info][:va_address] + rel_info.r_offset
-						ref_addr = ref_section[1][:section_info][:va_address] + sym_info.st_value
-						# plus 1byte for opecode
-						rel_addr = rel_info.r_addend + ref_addr - target_addr + 1
-
-						bytes = rel_addr.to_bin32_ary(true)
-						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
-						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
-						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
-					else
-						throw "Unexpected rel type, #{rel_info.type.to_h}"
-					end
-				end
-			end
+			# relocate rela section
+			relocate_rela_sections(rela_section_names, linked_section_map)
 
 			# リンク不要なセクションをここで削除
 			# 多分インデックスはここ以降ではされないはず
@@ -450,52 +496,9 @@ module ELF
 			end
 
 			# ========================================================================
-			# プログラムヘッダの作成
+			# make program header
 			# ========================================================================
-			prog_headers = []
-			link_options[:addr_map].each do |section_addr, section_names|
-				section_names.each do |section_name|
-					section_info = linked_section_map[section_name][:section_info]
-					program_h_info = {}
-					# LOAD固定
-					program_h_info[:p_type]   = ELF_PT_LOAD
-
-					# セクションオフセット位置
-					prog_offset = 0
-					prog_offset = ELF_SIZE_ELF32_HEADER + (ELF_SIZE_ELF32_PROG_HEADER * link_options[:addr_sections_num])
-
-					# セクションのオフセット位置を計算
-					linked_section_map.each_pair do |name, section|
-						break if section_name == name
-						prog_offset += section[:bin].size
-					end
-
-					if section_info[:type] == SH_TYPE_NOBITS
-						prog_offset = 0
-					end
-					program_h_info[:p_offset] = prog_offset
-
-					# とりあえずROM/RAM展開はなし
-					program_h_info[:p_vaddr]  = section_info[:va_address]
-					program_h_info[:p_paddr]  = section_info[:va_address]
-					program_h_info[:p_filesz] = section_info[:size]
-					program_h_info[:p_memsz]  = section_info[:size]
-
-					# セグメントの属性を設定
-					flg_val = ELF_PF_R
-					flag = section_info[:flags]
-					if (flag & ELF_FLG_EXECUTE) != 0
-						flg_val += ELF_PF_X
-					end
-					if (flag & ELF_FLG_WRITE) != 0
-						flg_val += ELF_PF_W
-					end
-
-					program_h_info[:p_flags]  = flg_val
-					program_h_info[:p_align]  = section_info[:addr_align]
-					prog_headers << program_h_info
-				end
-			end
+			prog_headers = make_program_header(link_options, linked_section_map)
 
 			# ELF header
 			linked_header = objs.first
@@ -512,9 +515,7 @@ module ELF
 			linked_header.elf_program_h_num = prog_headers.length
 			linked_header.elf_section_name_idx = linked_section_map[".shstrtab"][:section_info][:idx]
 
-			# ========================================================================
-			# セクションヘッダ出力オフセット計算
-			# ========================================================================
+			# calc section header offset size
 			sections_size  = 0
 			sections_count = 0
 			linked_section_map.each_pair do |section_name, section|
@@ -554,10 +555,6 @@ module ELF
 			linked_section_map.each_pair do |section_name, section|
 				# 実体のないセクションは書き込み不要
 				next if section[:section_info][:type] == SH_TYPE_NOBITS
-
-				# セクションのオフセット位置更新
-				# TODO ここでnilになる
-				#puts "bin:#{section[:bin]}"
 				section[:section_info][:offset] = cur_pos
 				cur_pos += link_f.write(section[:bin].pack("C*"))
 			end
