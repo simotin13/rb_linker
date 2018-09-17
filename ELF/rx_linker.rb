@@ -23,7 +23,6 @@ module ELF
 		R_RX_OPsctsize		= 0x88
 		R_RX_OPscttop  		= 0x8D
 
-
 	  def check_elf_header objs
 	    # check ELF Header of each objects
 	    true
@@ -134,7 +133,7 @@ module ELF
 			linked_sh_name_offset_map = {}
 			objs.each do |elf_object|
 
-				sh_idx = 0
+				#sh_idx = 0
 				cur_section_name_size_map = {}
 				cur_section_idx_name_map = {}
 				tmp_rela_section_info = {}
@@ -143,7 +142,7 @@ module ELF
 				# ======================================================================
 				# オブジェクト内の各セクション毎に結合を行う
 				# ======================================================================
-				elf_object.section_h_map.each_pair do |section_name, section_info|
+				elf_object.section_h_map.each_with_index  do |(section_name, section_info), sh_idx|
 					if linked_sh_name_offset_map[section_name].nil?
 						# 最初のオブジェクトのオフセット位置
 						linked_sh_name_offset_map[section_name] = 0
@@ -199,7 +198,6 @@ module ELF
 						puts "section_name:#{section_name}, bin:#{linked_section_map[section_name][:bin].size.to_h}, info:#{linked_section_map[section_name][:section_info][:size].to_h}"
 						throw "Link secion size not match!"
 					end
-					sh_idx += 1
 				end
 
 				# TODO 更新した シンボルテーブルの結合の次フェーズでの活用
@@ -209,10 +207,17 @@ module ELF
 				else
 					# 2オブジェクト目以降のシンボルテーブル →オフセット位置などの更新を行う
 					sym_ary = Elf32.to_symtab(tmp_symtab_info[:bin])
+					puts cur_section_idx_name_map
 					sym_ary.each do |sym|
-						# シンボル名文字列のサイズを取得しシンボルのオフセットを更新
+						# .strtabは結合ずみ
 						sym.st_name += linked_sh_name_offset_map[".strtab"]
+						# シンボル名を文字列として取得
 						sym_name = linked_section_map[".strtab"][:bin].c_str(sym.st_name)
+						if sym.has_ref_section?
+							ref_section_name = cur_section_idx_name_map[sym.st_shndx]
+							sym.st_value += linked_sh_name_offset_map[ref_section_name]
+							puts "★ #{ref_section_name} sym:#{sym_name}:sym.st_value:#{sym.st_value.to_h}"
+						end
 
 						# 重複するシンボルの探索
 						has_same_symbol = false
@@ -222,6 +227,9 @@ module ELF
 							if sym_name == pre_sym_name
 								# 既に同一シンボル名のエントリが存在する場合は上書きする
 								has_same_symbol = true
+
+								# ★ TODO この辺でst_valueを結合したバイナリのオフセットにする
+								puts "sym:#{sym_name}, sym.st_value:#{sym.st_value}"
 								pre_sym.st_value = sym.st_value
 								pre_sym.st_size = sym.st_size
 								pre_sym.st_info = sym.st_info
@@ -417,15 +425,17 @@ module ELF
 					when R_RX_DIR24S_PCREL
 						puts  "#{name}, #{rel_info.symbol_idx}"
 						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
-						target_section_name = ref_section[0]
-						#puts "target_section_name:#{target_section_name}"
-						ref_addr = ref_section[1][:section_info][:va_address]
-						ref_addr += sym_info.st_value
+						ref_section_name = ref_section[0]
+						puts "ref_section_name:#{ref_section_name}"
+						ref_addr = ref_section[1][:section_info][:va_address] + sym_info.st_value
+						puts "ref_addr:#{ref_addr.to_h}, rel_info.r_offset:#{rel_info.r_offset.to_h}"
+						puts "target_section[:section_info][:va_address]:#{target_section[:section_info][:va_address].to_h}"
+						rel_addr = ref_addr - target_section[:section_info][:va_address] + rel_info.r_addend
+						puts "rel_addr:#{rel_addr.to_h}"
 						bytes = ref_addr.to_bin32_ary(true)
 						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
 						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
 						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
-						puts "atf"
 						#puts linked_section_map["FIXEDVECT"][:bin]
 					else
 						throw "Unexpected rel type, #{rel_info.type.to_h}"
@@ -543,7 +553,6 @@ module ELF
 			# write secions
 			# ======================================================
 			linked_section_map.each_pair do |section_name, section|
-				puts "write section:#{section_name}"
 				# 実体のないセクションは書き込み不要
 				next if section[:section_info][:type] == SH_TYPE_NOBITS
 
@@ -558,7 +567,6 @@ module ELF
 			# write section headers
 			# ======================================================
 			linked_section_map.each_pair do |section_name, section|
-				puts "write section header:#{section_name}"
 				cur_pos += write_section_header(link_f, section[:section_info])
 			end
 			link_f.close
