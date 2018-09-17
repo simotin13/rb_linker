@@ -157,8 +157,6 @@ module ELF
 					if rela_section_names.include?(section_name)
 						rela_bin = elf_object.get_section_data(section_name)
 						tmp_rela_section_info[section_name] = {section_info: section_info, bin: rela_bin}
-						# PResetPRGセクションのオフセット
-						puts "skip #{section_name}..."
 						next
 					end
 
@@ -207,7 +205,6 @@ module ELF
 				else
 					# 2オブジェクト目以降のシンボルテーブル →オフセット位置などの更新を行う
 					sym_ary = Elf32.to_symtab(tmp_symtab_info[:bin])
-					puts cur_section_idx_name_map
 					sym_ary.each do |sym|
 						# .strtabは結合ずみ
 						sym.st_name += linked_sh_name_offset_map[".strtab"]
@@ -216,7 +213,6 @@ module ELF
 						if sym.has_ref_section?
 							ref_section_name = cur_section_idx_name_map[sym.st_shndx]
 							sym.st_value += linked_sh_name_offset_map[ref_section_name]
-							puts "★ #{ref_section_name} sym:#{sym_name}:sym.st_value:#{sym.st_value.to_h}"
 						end
 
 						# 重複するシンボルの探索
@@ -227,9 +223,6 @@ module ELF
 							if sym_name == pre_sym_name
 								# 既に同一シンボル名のエントリが存在する場合は上書きする
 								has_same_symbol = true
-
-								# ★ TODO この辺でst_valueを結合したバイナリのオフセットにする
-								puts "sym:#{sym_name}, sym.st_value:#{sym.st_value}"
 								pre_sym.st_value = sym.st_value
 								pre_sym.st_size = sym.st_size
 								pre_sym.st_info = sym.st_info
@@ -420,23 +413,30 @@ module ELF
 						val = arg1 + arg2
 						rel_calc_stack << val
 					when R_RX_DIR8S_PCREL
-						rel_addr = rel_info.r_addend - rel_info.r_offset + 1
-						target_section[:bin][rel_info.r_offset] = rel_addr
-					when R_RX_DIR24S_PCREL
-						puts  "#{name}, #{rel_info.symbol_idx}"
 						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
 						ref_section_name = ref_section[0]
-						puts "ref_section_name:#{ref_section_name}"
+						target_addr = target_section[:section_info][:va_address] + rel_info.r_offset
 						ref_addr = ref_section[1][:section_info][:va_address] + sym_info.st_value
-						puts "ref_addr:#{ref_addr.to_h}, rel_info.r_offset:#{rel_info.r_offset.to_h}"
-						puts "target_section[:section_info][:va_address]:#{target_section[:section_info][:va_address].to_h}"
-						rel_addr = ref_addr - target_section[:section_info][:va_address] + rel_info.r_addend
+						# plus 1byte for opecode
+						rel_addr = rel_info.r_addend + ref_addr - target_addr + 1
+						bytes = rel_addr.to_bin32_ary(true)
 						puts "rel_addr:#{rel_addr.to_h}"
-						bytes = ref_addr.to_bin32_ary(true)
+						target_section[:bin][rel_info.r_offset + 0] = rel_addr
+						# plus 1byte for opecode
+						#rel_addr = rel_info.r_addend - rel_info.r_offset + 1
+						#target_section[:bin][rel_info.r_offset] = rel_addr
+					when R_RX_DIR24S_PCREL
+						ref_section = linked_section_map.find{|key,val| val[:section_info][:idx] == sym_info.st_shndx}
+						ref_section_name = ref_section[0]
+						target_addr = target_section[:section_info][:va_address] + rel_info.r_offset
+						ref_addr = ref_section[1][:section_info][:va_address] + sym_info.st_value
+						# plus 1byte for opecode
+						rel_addr = rel_info.r_addend + ref_addr - target_addr + 1
+
+						bytes = rel_addr.to_bin32_ary(true)
 						target_section[:bin][rel_info.r_offset + 0] = bytes[0]
 						target_section[:bin][rel_info.r_offset + 1] = bytes[1]
 						target_section[:bin][rel_info.r_offset + 2] = bytes[2]
-						#puts linked_section_map["FIXEDVECT"][:bin]
 					else
 						throw "Unexpected rel type, #{rel_info.type.to_h}"
 					end
@@ -467,7 +467,6 @@ module ELF
 					# セクションのオフセット位置を計算
 					linked_section_map.each_pair do |name, section|
 						break if section_name == name
-						puts "name:#{name} prog_offset:#{prog_offset.to_h}, size:#{section[:bin].size.to_h}"
 						prog_offset += section[:bin].size
 					end
 
