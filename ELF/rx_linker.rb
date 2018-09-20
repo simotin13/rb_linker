@@ -286,7 +286,7 @@ module ELF
 						next
 					end
 
-					# .symtab は更新作業あるので対しして後で別途結合
+					# .symtab は内容の更新が必要→退避してから別途結合する
 					if section_name == ".symtab"
 						symtab_bin = elf_object.get_section_data(section_name)
 						tmp_symtab_info = {section_info: section_info, bin: symtab_bin}
@@ -305,7 +305,6 @@ module ELF
 					# セクションサイズ分オフセットを更新(実体のない(SH_TYPE_NOBITS)セクションは更新不要)
 					if section_info[:type] == SH_TYPE_NOBITS
 						# TODO 要確認 SH_TYPE_NOBITSを考慮しなくてよい？
-						puts "#{section_name} is NOBITS"
 						next
 					end
 
@@ -391,15 +390,15 @@ module ELF
 				# ==================================================
 				rela_section_names.each do |rela_secion_name|
 					unless tmp_rela_section_info[rela_secion_name].nil?
-						rela_PResetPRG = update_rela_sections(rela_secion_name, tmp_rela_section_info, linked_sh_name_offset_map)
+						rela_section = update_rela_sections(rela_secion_name, tmp_rela_section_info, linked_sh_name_offset_map)
 						# セクション名のインデックスを更新
 						tmp_rela_section_info[rela_secion_name][:section_info][:name_idx] += linked_sh_name_offset_map[".shstrtab"]
 						if linked_section_map[rela_secion_name].nil?
 							# relaPResetPRGが最初に出てきた場合
 							linked_section_map[rela_secion_name] = {section_info: tmp_rela_section_info[rela_secion_name][:section_info], bin: []}
 						end
-						# relaPResetPRGの更新
-						linked_section_map[rela_secion_name][:bin].concat(rela_PResetPRG)
+						# リロケーション情報を更新
+						linked_section_map[rela_secion_name][:bin].concat(rela_section)
 					end
 				end
 
@@ -448,7 +447,6 @@ module ELF
 			# ======================================================================
 			# リンクする必要がないセクションはここで削除
 			# ======================================================================
-			puts "delete $iop secion..."
 			iop_idx = linked_section_map["$iop"][:section_info][:idx]
 			linked_section_map.delete("$iop")
 			linked_section_map.each do |section_name, section|
