@@ -14,9 +14,39 @@
 // =============================================================================
 static VALUE rb_elfModule;				// Module ELF
 static VALUE rb_cElf32;					// Class Elf32
+static VALUE rb_cElf32Shdr;				// Class Elf32Shdr
 static VALUE rb_cElf32Sym;				// Class Elf32Sym
 static VALUE rb_cElf32Rel;				// Class Elf32Rel
 static VALUE rb_cElf32Rela;				// Class Elf32Rela
+
+// =============================================================================
+// Elf32Shdr
+// =============================================================================
+static VALUE elf32shdr_alloc(VALUE self);
+static VALUE rb_elf32shdr_new(void);
+static size_t rb_elf32shdr_size(const void *ptr);
+static void rb_elf32shdr_free(void *ptr);
+static VALUE elf32shdr_struct2obj(const Elf32_Shdr *pShdr);
+static VALUE elf32shdr_get_sh_name(VALUE self);
+static VALUE elf32shdr_set_sh_name(VALUE self, VALUE type);
+static VALUE elf32shdr_get_sh_type(VALUE self);
+static VALUE elf32shdr_set_sh_type(VALUE self, VALUE type);
+static VALUE elf32shdr_get_sh_flags(VALUE self);
+static VALUE elf32shdr_set_sh_flags(VALUE self, VALUE flags);
+static VALUE elf32shdr_get_sh_addr(VALUE self);
+static VALUE elf32shdr_set_sh_addr(VALUE self, VALUE addr);
+static VALUE elf32shdr_get_sh_offset(VALUE self);
+static VALUE elf32shdr_set_sh_offset(VALUE self, VALUE offset);
+static VALUE elf32shdr_get_sh_size(VALUE self);
+static VALUE elf32shdr_set_sh_size(VALUE self, VALUE size);
+static VALUE elf32shdr_get_sh_link(VALUE self);
+static VALUE elf32shdr_set_sh_link(VALUE self, VALUE link);
+static VALUE elf32shdr_get_sh_info(VALUE self);
+static VALUE elf32shdr_set_sh_info(VALUE self, VALUE info);
+static VALUE elf32shdr_get_sh_addralign(VALUE self);
+static VALUE elf32shdr_set_sh_addralign(VALUE self, VALUE addralign);
+static VALUE elf32shdr_get_sh_entsize(VALUE self);
+static VALUE elf32shdr_set_sh_entsize(VALUE self, VALUE entsize);
 
 // =============================================================================
 // Elf32Sym
@@ -89,6 +119,8 @@ static size_t rb_elf32_size(const void *ptr);
 static VALUE elf32_initialize(VALUE self, VALUE filepath);
 static VALUE elf32_show_Ehdr(VALUE self);
 static VALUE elf32_get_symtab(VALUE self);
+static VALUE elf32_ary2shdrtab(VALUE self, VALUE ary);
+static VALUE elf32_shdrtab2ary(VALUE self, VALUE shdrtab);
 static VALUE elf32_ary2symtab(VALUE self, VALUE ary);
 static VALUE elf32_symtab2ary(VALUE self, VALUE symtab);
 static VALUE elf32_ary2reltab(VALUE self, VALUE ary);
@@ -115,6 +147,288 @@ static void dbg_puts(const char *fmt, ...)
     fprintf(stderr, "\n");
     va_end(ap);
 	return;
+}
+
+// =============================================================================
+// Elf32Shdr type info
+// =============================================================================
+static const rb_data_type_t rb_elf32shdr_type = {
+    "ELF/Elf32Shdr",
+    {
+		0,							// dmark
+    	rb_elf32shdr_free,			// dfree
+    	rb_elf32shdr_size,			// dsize
+    	{0},						// reserved
+    },
+    0,								// parent
+	0,								// for user
+	RUBY_TYPED_FREE_IMMEDIATELY,	// free when unused.
+};
+
+// =============================================================================
+// Elf32Shdr alloc
+// =============================================================================
+static VALUE elf32shdr_alloc(VALUE self)
+{
+	Elf32_Sym *ptr;
+	return TypedData_Make_Struct(self, Elf32_Sym, &rb_elf32shdr_type, ptr);
+}
+
+// =============================================================================
+// Elf32Shdr new
+// =============================================================================
+static VALUE rb_elf32shdr_new(void)
+{
+	return elf32shdr_alloc(rb_cElf32Sym);
+}
+
+// =============================================================================
+// Elf32Shdr free
+// =============================================================================
+static void rb_elf32shdr_free(void *ptr)
+{
+	free(ptr);
+	return;
+}
+
+// =============================================================================
+// Elf32Shdr size
+// =============================================================================
+static size_t rb_elf32shdr_size(const void *ptr)
+{
+	return sizeof(Elf32_Shdr);
+}
+
+// =============================================================================
+// Elf32Shdr create object from Elf32_Shdr
+// =============================================================================
+static VALUE elf32shdr_struct2obj(const Elf32_Shdr *pShdr)
+{
+	VALUE obj;
+	Elf32_Shdr *ptr;
+	obj = rb_elf32shdr_new();
+	TypedData_Get_Struct(obj, Elf32_Shdr, &rb_elf32shdr_type, ptr);
+	memcpy(ptr, pShdr, sizeof(Elf32_Shdr));
+	return obj;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_name
+// =============================================================================
+static VALUE elf32shdr_get_sh_name(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_name);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_name
+// =============================================================================
+static VALUE elf32shdr_set_sh_name(VALUE self, VALUE name)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(name, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_name = NUM2INT(name);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_type
+// =============================================================================
+static VALUE elf32shdr_get_sh_type(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_type);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_type
+// =============================================================================
+static VALUE elf32shdr_set_sh_type(VALUE self, VALUE type)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(type, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_type = NUM2INT(type);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_flags
+// =============================================================================
+static VALUE elf32shdr_get_sh_flags(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_flags);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_flags
+// =============================================================================
+static VALUE elf32shdr_set_sh_flags(VALUE self, VALUE flags)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(flags, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_flags = NUM2INT(flags);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_addr
+// =============================================================================
+static VALUE elf32shdr_get_sh_addr(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_addr);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_addr
+// =============================================================================
+static VALUE elf32shdr_set_sh_addr(VALUE self, VALUE addr)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(addr, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_addr = NUM2INT(addr);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_offset
+// =============================================================================
+static VALUE elf32shdr_get_sh_offset(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_offset);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_offset
+// =============================================================================
+static VALUE elf32shdr_set_sh_offset(VALUE self, VALUE offset)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(offset, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_offset = NUM2INT(offset);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_size
+// =============================================================================
+static VALUE elf32shdr_get_sh_size(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_size);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_size
+// =============================================================================
+static VALUE elf32shdr_set_sh_size(VALUE self, VALUE size)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(size, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_size = NUM2INT(size);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_link
+// =============================================================================
+static VALUE elf32shdr_get_sh_link(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_link);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_link
+// =============================================================================
+static VALUE elf32shdr_set_sh_link(VALUE self, VALUE link)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(link, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_link = NUM2INT(link);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_info
+// =============================================================================
+static VALUE elf32shdr_get_sh_info(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_info);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_info
+// =============================================================================
+static VALUE elf32shdr_set_sh_info(VALUE self, VALUE info)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(info, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_info = NUM2INT(info);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_addralign
+// =============================================================================
+static VALUE elf32shdr_get_sh_addralign(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_addralign);
+}
+
+// =============================================================================
+// Elf32Shdr Set sh_addralign
+// =============================================================================
+static VALUE elf32shdr_set_sh_addralign(VALUE self, VALUE addralign)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(addralign, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_addralign = NUM2INT(addralign);
+	return self;
+}
+
+// =============================================================================
+// Elf32Shdr Get sh_entsize
+// =============================================================================
+static VALUE elf32shdr_get_sh_entsize(VALUE self)
+{
+	Elf32_Shdr *pShdr;
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	return INT2NUM(pShdr->sh_entsize);
+}
+// =============================================================================
+// Elf32Shdr Set sh_entsize
+// =============================================================================
+static VALUE elf32shdr_set_sh_entsize(VALUE self, VALUE entsize)
+{
+	Elf32_Shdr *pShdr;
+	Check_Type(entsize, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+	pShdr->sh_entsize = NUM2INT(entsize);
+	return self;
 }
 
 // =============================================================================
@@ -915,6 +1229,58 @@ static VALUE elf32_get_symtab(VALUE self)
 }
 
 // =============================================================================
+// ELF32 Create Elf32_Shdr Array from Array(Byte Array)
+// =============================================================================
+static VALUE elf32_ary2shdrtab(VALUE self, VALUE ary)
+{
+	int i,len;
+	int count;
+	uint8_t *pBin;
+	Elf32_Shdr *pShdr;
+	VALUE shdrtab;
+
+	Check_Type(ary, T_ARRAY);
+
+	len = RARRAY_LEN(ary);
+	pBin = malloc(len);
+	for(i = 0; i < len; i++) {
+		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
+	}
+
+	pShdr = (Elf32_Shdr *)pBin;
+	shdrtab = rb_ary_new();
+	count = len / sizeof(Elf32_Shdr);
+	for (i = 0; i < count; i++) {
+		rb_ary_push(shdrtab, elf32shdr_struct2obj(pShdr));
+		pShdr++;
+	}
+	return shdrtab;
+}
+// =============================================================================
+// ELF32 Create Byte Array from Symbol Table(Elf32_Shdr Array)
+// =============================================================================
+static VALUE elf32_shdrtab2ary(VALUE self, VALUE shdrtab)
+{
+	size_t i, j, len;
+	uint8_t *pBin;
+	Elf32_Shdr *pShdr;
+	VALUE ary_bin;
+
+	Check_Type(shdrtab, T_ARRAY);
+	len = RARRAY_LEN(shdrtab);
+	ary_bin = rb_ary_new();
+
+	for(i = 0; i < len; i++) {
+		TypedData_Get_Struct(rb_ary_entry(shdrtab, i), Elf32_Shdr, &rb_elf32shdr_type, pShdr);
+		pBin = (uint8_t *)pShdr;
+		for (j = 0; j < sizeof(Elf32_Shdr); j++) {
+			rb_ary_push(ary_bin, INT2FIX(pBin[j]));
+		}
+	}
+	return ary_bin;
+}
+
+// =============================================================================
 // ELF32 Create Elf32_Sym Array from Array(Byte Array)
 // =============================================================================
 static VALUE elf32_ary2symtab(VALUE self, VALUE ary)
@@ -1064,10 +1430,36 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32, "initialize", elf32_initialize, 1);
 	rb_define_method(rb_cElf32, "show_Ehdr", elf32_show_Ehdr, 0);
 	rb_define_method(rb_cElf32, "symtab", elf32_get_symtab, 0);
+	rb_define_singleton_method( rb_cElf32, "to_shdrtab", elf32_ary2shdrtab, 1);
 	rb_define_singleton_method( rb_cElf32, "to_symtab", elf32_ary2symtab, 1);
+	rb_define_singleton_method( rb_cElf32, "shdrtab_to_bin", elf32_shdrtab2ary, 1);
 	rb_define_singleton_method( rb_cElf32, "symtab_to_bin", elf32_symtab2ary, 1);
 	rb_define_singleton_method( rb_cElf32, "to_reltab", elf32_ary2reltab, 1);
 	rb_define_singleton_method( rb_cElf32, "to_relatab", elf32_ary2relatab, 1);
+
+	// Initialize rb_cElf32Shdr
+	rb_cElf32Shdr = rb_define_class_under(rb_elfModule, "Elf32Shdr", rb_cObject);
+    rb_define_alloc_func(rb_cElf32Shdr, elf32shdr_alloc);
+	rb_define_method(rb_cElf32Shdr, "sh_name", elf32shdr_get_sh_name, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_name", elf32shdr_set_sh_name, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_type", elf32shdr_get_sh_type, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_type", elf32shdr_set_sh_type, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_flags", elf32shdr_get_sh_flags, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_flags", elf32shdr_set_sh_flags, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_addr", elf32shdr_get_sh_addr, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_addr", elf32shdr_set_sh_addr, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_offset", elf32shdr_get_sh_offset, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_offset", elf32shdr_set_sh_offset, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_size", elf32shdr_get_sh_size, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_size", elf32shdr_set_sh_size, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_link", elf32shdr_get_sh_link, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_link", elf32shdr_set_sh_link, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_info", elf32shdr_get_sh_info, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_info", elf32shdr_set_sh_info, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_addralign", elf32shdr_get_sh_addralign, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_addralign", elf32shdr_set_sh_addralign, 1);
+	rb_define_method(rb_cElf32Shdr, "sh_entsize", elf32shdr_get_sh_entsize, 0);
+	rb_define_method(rb_cElf32Shdr, "=sh_entsize", elf32shdr_set_sh_entsize, 1);
 
 	// Initialize rb_cElf32Sym
 	rb_cElf32Sym = rb_define_class_under(rb_elfModule, "Elf32Sym" , rb_cObject);
