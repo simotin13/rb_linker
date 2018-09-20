@@ -29,9 +29,10 @@ app.rbがエントリポイントです。
 サンプルについて
 --
 test/led フォルダ以下にGR-SAKURAで動作確認をしたサンプルプロジェクト一式があります。
+https://github.com/simotin13/rb_linker/tree/master/test/led
 
-## one_file
+- one_file
 resetprg.obgのみをリンクします。
 
-## two_files
+- two_files
 resetprg.obgとmain.objをリンクします。
