@@ -11,14 +11,20 @@
 --
 1).setup.shを実行します。
 ./setup.sh
+
 setup.sh ではRubyの拡張モジュールのビルドと配置を行います。
+rubyがビルドできる環境があれば拡張モジュールはビルドできるはずです。
+Debian/Ubuntu系の環境だと、
+$sudo apt install ruby-dev
+でrubyのビルドに必要なファイルがインストールされます。
+
 正常にビルドが終了するとelf32.soというライブラリが生成され、ELFフォルダに配置されます。
 リンカを動かすのに必要な準備は以上です。
 
 2).リンカの実行
 app.rbがエントリポイントです。
 コマンドライン引数で .clinkファイルを指定すると .clinkファイルの内容に従ってリンクを行います。
-実行例).
+実行例)
 ./app test/led/two_files/
 
 リンクが終了すると、.clinkで指定したファイル名が出力されます。
@@ -32,7 +38,7 @@ test/led フォルダ以下にGR-SAKURAで動作確認をしたサンプルプ�
 https://github.com/simotin13/rb_linker/tree/master/test/led
 
 - one_file
-resetprg.obgのみをリンクします。
+resetprg.objのみをリンクします。
 
 - two_files
-resetprg.obgとmain.objをリンクします。
+resetprg.objとmain.objをリンクします。
