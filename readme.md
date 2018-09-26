@@ -23,7 +23,7 @@ $sudo apt install ruby-dev
 
 2).リンカの実行
 app.rbがエントリポイントです。
-コマンドライン引数で .clinkファイルを指定すると .clinkファイルの内容に従ってリンクを行います。
+コマンドライン引数で .clnkファイルを指定すると .clnkファイルの内容に従ってリンクを行います。
 
 実行例)
 ./app.rb  test/led/one_file/DefaultBuild/sakura2.clnk
