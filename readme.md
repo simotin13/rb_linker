@@ -24,10 +24,10 @@ $sudo apt install ruby-dev
 2).リンカの実行
 app.rbがエントリポイントです。
 コマンドライン引数で .clinkファイルを指定すると .clinkファイルの内容に従ってリンクを行います。
-実行例)
-./app test/led/two_files/
 
-リンクが終了すると、.clinkで指定したファイル名が出力されます。
+実行例)
+./app.rb  test/led/one_file/DefaultBuild/sakura2.clnk
+リンクが終了すると、.clnkの-outputで指定したファイルが出力されます。
 
 3).書き込み
 リンクしたファイル(.abs)をE1エミュレータ等をターゲットボードに書き込み、プログラムを実行してください。
@@ -38,7 +38,9 @@ test/led フォルダ以下にGR-SAKURAで動作確認をしたサンプルプ�
 https://github.com/simotin13/rb_linker/tree/master/test/led
 
 - one_file
-resetprg.objのみをリンクします。
+１ファイル(resetprg.obj)のみをリンクするサンプルです。
+DefaultBuild/sakura.clnkファイルを指定してリンクします。
+リンクが終了するとDefaultBuild/sakura.absが出力されます。※CS+でビルド済みのsakura.absを上書きします。
 
 - two_files
-resetprg.objとmain.objをリンクします。
+DefaultBuild/resetprg.objとDefaultBuild/main.objをリンクします。
