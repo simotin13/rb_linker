@@ -4,7 +4,7 @@ require 'machine_arch_list'
 
 module ELF
 	class ElfObject
-		attr_accessor :section_h_map, :ident, :elf_class, :elf_endian, :elf_version,
+		attr_accessor :bin, :section_h_map, :ident, :elf_class, :elf_endian, :elf_version,
 									:os_abi, :elf_type, :elf_machine, :elf_version, :elf_entry,
 									:elf_program_h_offset, :elf_section_h_offset, :elf_flags,
 									:elf_h_size, :elf_program_h_size, :elf_program_h_num,
@@ -122,6 +122,10 @@ module ELF
 			#show_elf_header
 
 			get_program_header
+		end
+
+		def get_elf_header
+			@bin.slice(0, ELF_SIZE_ELF32_HEADER)
 		end
 
 		# ============================================================================
@@ -479,7 +483,7 @@ module ELF
 			@symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 			# DEBUG
-			#show_symbol_table(@symbol_table)
+			show_symbol_table(@symbol_table)
 
 			# get relocation section info(.rela.*, .rel.*)
 			@rel_sections = {}
