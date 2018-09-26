@@ -14,10 +14,48 @@
 // =============================================================================
 static VALUE rb_elfModule;				// Module ELF
 static VALUE rb_cElf32;					// Class Elf32
+static VALUE rb_cElf32Ehdr;				// Class Elf32Ehdr
 static VALUE rb_cElf32Shdr;				// Class Elf32Shdr
 static VALUE rb_cElf32Sym;				// Class Elf32Sym
 static VALUE rb_cElf32Rel;				// Class Elf32Rel
 static VALUE rb_cElf32Rela;				// Class Elf32Rela
+
+// =============================================================================
+// Elf32Ehdr
+// =============================================================================
+static VALUE elf32ehdr_alloc(VALUE self);
+static VALUE rb_elf32ehdr_new(void);
+static size_t rb_elf32ehdr_size(const void *ptr);
+static void rb_elf32ehdr_free(void *ptr);
+static VALUE elf32ehdr_struct2obj(const Elf32_Ehdr *pEhdr);
+static VALUE elf32ehdr_get_ident(VALUE self);
+static VALUE elf32ehdr_set_ident(VALUE self, VALUE ident_ary);
+static VALUE elf32ehdr_set_type(VALUE self, VALUE type);
+static VALUE elf32ehdr_get_type(VALUE self);
+static VALUE elf32ehdr_get_machine(VALUE self);
+static VALUE elf32ehdr_set_machine(VALUE self, VALUE machine);
+static VALUE elf32ehdr_set_phoff(VALUE self, VALUE phoff);
+static VALUE elf32ehdr_get_version(VALUE self);
+static VALUE elf32ehdr_set_version(VALUE self, VALUE version);
+static VALUE elf32ehdr_get_entry(VALUE self);
+static VALUE elf32ehdr_set_entry(VALUE self, VALUE entry);
+static VALUE elf32ehdr_get_phoff(VALUE self);
+static VALUE elf32ehdr_set_shoff(VALUE self, VALUE shoff);
+static VALUE elf32ehdr_get_shoff(VALUE self);
+static VALUE elf32ehdr_get_flags(VALUE self);
+static VALUE elf32ehdr_set_flags(VALUE self, VALUE flags);
+static VALUE elf32ehdr_get_ehsize(VALUE self);
+static VALUE elf32ehdr_set_ehsize(VALUE self, VALUE ehsize);
+static VALUE elf32ehdr_get_phentsize(VALUE self);
+static VALUE elf32ehdr_set_phentsize(VALUE self, VALUE phentsize);
+static VALUE elf32ehdr_get_phnum(VALUE self);
+static VALUE elf32ehdr_set_phnum(VALUE self, VALUE phnum);
+static VALUE elf32ehdr_get_shentsize(VALUE self);
+static VALUE elf32ehdr_set_shentsize(VALUE self, VALUE shentsize);
+static VALUE elf32ehdr_get_shnum(VALUE self);
+static VALUE elf32ehdr_set_shnum(VALUE self, VALUE shnum);
+static VALUE elf32ehdr_get_shstrndx(VALUE self);
+static VALUE elf32ehdr_set_shstrndx(VALUE self, VALUE shstrndx);
 
 // =============================================================================
 // Elf32Shdr
@@ -119,6 +157,7 @@ static size_t rb_elf32_size(const void *ptr);
 static VALUE elf32_initialize(VALUE self, VALUE filepath);
 static VALUE elf32_show_Ehdr(VALUE self);
 static VALUE elf32_get_symtab(VALUE self);
+static VALUE elf32_ary2ehdrtab(VALUE self, VALUE ary);
 static VALUE elf32_ary2shdrtab(VALUE self, VALUE ary);
 static VALUE elf32_shdrtab2ary(VALUE self, VALUE shdrtab);
 static VALUE elf32_ary2symtab(VALUE self, VALUE ary);
@@ -150,6 +189,398 @@ static void dbg_puts(const char *fmt, ...)
 }
 
 // =============================================================================
+// Elf32Ehdr type info
+// =============================================================================
+static const rb_data_type_t rb_elf32ehdr_type = {
+    "ELF/Elf32Ehdr",
+    {
+		0,							// dmark
+    	rb_elf32ehdr_free,			// dfree
+    	rb_elf32ehdr_size,			// dsize
+    	{0},						// reserved
+    },
+    0,								// parent
+	0,								// for user
+	RUBY_TYPED_FREE_IMMEDIATELY,	// free when unused.
+};
+
+// =============================================================================
+// Elf32Ehdr alloc
+// =============================================================================
+static VALUE elf32ehdr_alloc(VALUE self)
+{
+	Elf32_Shdr *ptr;
+	return TypedData_Make_Struct(self, Elf32_Shdr, &rb_elf32ehdr_type, ptr);
+}
+
+// =============================================================================
+// Elf32Ehdr new
+// =============================================================================
+static VALUE rb_elf32ehdr_new(void)
+{
+	return elf32ehdr_alloc(rb_cElf32Ehdr);
+}
+
+// =============================================================================
+// Elf32Ehdr free
+// =============================================================================
+static void rb_elf32ehdr_free(void *ptr)
+{
+	free(ptr);
+	return;
+}
+
+// =============================================================================
+// Elf32Ehdr size
+// =============================================================================
+static size_t rb_elf32ehdr_size(const void *ptr)
+{
+	return sizeof(Elf32_Ehdr);
+}
+
+// =============================================================================
+// Elf32Ehdr create object from Elf32_Ehdr
+// =============================================================================
+static VALUE elf32ehdr_struct2obj(const Elf32_Ehdr *pEhdr)
+{
+	VALUE obj;
+	Elf32_Ehdr *ptr;
+	obj = rb_elf32ehdr_new();
+	TypedData_Get_Struct(obj, Elf32_Ehdr, &rb_elf32ehdr_type, ptr);
+	memcpy(ptr, pEhdr, sizeof(Elf32_Ehdr));
+	return obj;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_ident
+// =============================================================================
+static VALUE elf32ehdr_get_ident(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	int i;
+	VALUE ident_ary;
+
+	ident_ary = rb_ary_new();
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	for (i = 0; i < EI_NIDENT; i++) {
+		rb_ary_push(ident_ary, INT2FIX(pEhdr->e_ident[i]));
+	}
+
+	return ident_ary;
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_ident
+// =============================================================================
+static VALUE elf32ehdr_set_ident(VALUE self, VALUE ident_ary)
+{
+	Elf32_Ehdr *pEhdr;
+	int i, len;
+	
+	Check_Type(ident_ary, T_ARRAY);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	len = RARRAY_LEN(ident_ary);
+	if (len != EI_NIDENT)
+	{
+		raise_exception(__FUNCTION__, __LINE__);
+		return Qnil;
+	}
+
+	for(i = 0; i < EI_NIDENT; i++) {
+		pEhdr->e_ident[i] = NUM2CHR(rb_ary_entry(ident_ary, i));
+	}
+
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_type
+// =============================================================================
+static VALUE elf32ehdr_get_type(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_type);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_type
+// =============================================================================
+static VALUE elf32ehdr_set_type(VALUE self, VALUE type)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(type, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_type = NUM2INT(type);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_machine
+// =============================================================================
+static VALUE elf32ehdr_get_machine(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_machine);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_machine
+// =============================================================================
+static VALUE elf32ehdr_set_machine(VALUE self, VALUE machine)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(machine, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_machine = NUM2INT(machine);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_version
+// =============================================================================
+static VALUE elf32ehdr_get_version(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_version);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_version
+// =============================================================================
+static VALUE elf32ehdr_set_version(VALUE self, VALUE version)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(version, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_version = NUM2INT(version);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_entry
+// =============================================================================
+static VALUE elf32ehdr_get_entry(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_entry);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_entry
+// =============================================================================
+static VALUE elf32ehdr_set_entry(VALUE self, VALUE entry)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(entry, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_entry = NUM2INT(entry);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_phoff
+// =============================================================================
+static VALUE elf32ehdr_get_phoff(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_phoff);
+}
+
+
+// =============================================================================
+// Elf32Ehdr Set e_phoff
+// =============================================================================
+static VALUE elf32ehdr_set_phoff(VALUE self, VALUE phoff)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(phoff, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_phoff = NUM2INT(phoff);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_shoff
+// =============================================================================
+static VALUE elf32ehdr_get_shoff(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_shoff);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_shoff
+// =============================================================================
+static VALUE elf32ehdr_set_shoff(VALUE self, VALUE shoff)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(shoff, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_shoff = NUM2INT(shoff);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_flags
+// =============================================================================
+static VALUE elf32ehdr_get_flags(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_flags);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_flags
+// =============================================================================
+static VALUE elf32ehdr_set_flags(VALUE self, VALUE flags)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(flags, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_flags = NUM2INT(flags);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_ehsize
+// =============================================================================
+static VALUE elf32ehdr_get_ehsize(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_ehsize);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_ehsize
+// =============================================================================
+static VALUE elf32ehdr_set_ehsize(VALUE self, VALUE ehsize)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(ehsize, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_ehsize = NUM2INT(ehsize);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_phentsize
+// =============================================================================
+static VALUE elf32ehdr_get_phentsize(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_phentsize);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_phentsize
+// =============================================================================
+static VALUE elf32ehdr_set_phentsize(VALUE self, VALUE phentsize)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(phentsize, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_phentsize = NUM2INT(phentsize);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_phnum
+// =============================================================================
+static VALUE elf32ehdr_get_phnum(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_phnum);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_phnum
+// =============================================================================
+static VALUE elf32ehdr_set_phnum(VALUE self, VALUE phnum)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(phnum, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_phnum = NUM2INT(phnum);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_shentsize
+// =============================================================================
+static VALUE elf32ehdr_get_shentsize(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_shentsize);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_shentsize
+// =============================================================================
+static VALUE elf32ehdr_set_shentsize(VALUE self, VALUE shentsize)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(shentsize, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_shentsize = NUM2INT(shentsize);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_shnum
+// =============================================================================
+static VALUE elf32ehdr_get_shnum(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_shnum);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_shnum
+// =============================================================================
+static VALUE elf32ehdr_set_shnum(VALUE self, VALUE shnum)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(shnum, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_shnum = NUM2INT(shnum);
+	return self;
+}
+
+// =============================================================================
+// Elf32Ehdr Get e_shstrndx
+// =============================================================================
+static VALUE elf32ehdr_get_shstrndx(VALUE self)
+{
+	Elf32_Ehdr *pEhdr;
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	return INT2NUM(pEhdr->e_shstrndx);
+}
+
+// =============================================================================
+// Elf32Ehdr Set e_shstrndx
+// =============================================================================
+static VALUE elf32ehdr_set_shstrndx(VALUE self, VALUE shstrndx)
+{
+	Elf32_Ehdr *pEhdr;
+	Check_Type(shstrndx, T_FIXNUM);
+	TypedData_Get_Struct(self, Elf32_Ehdr, &rb_elf32ehdr_type, pEhdr);
+	pEhdr->e_shstrndx = NUM2INT(shstrndx);
+	return self;
+}
+
+// =============================================================================
 // Elf32Shdr type info
 // =============================================================================
 static const rb_data_type_t rb_elf32shdr_type = {
@@ -170,8 +601,8 @@ static const rb_data_type_t rb_elf32shdr_type = {
 // =============================================================================
 static VALUE elf32shdr_alloc(VALUE self)
 {
-	Elf32_Sym *ptr;
-	return TypedData_Make_Struct(self, Elf32_Sym, &rb_elf32shdr_type, ptr);
+	Elf32_Shdr *ptr;
+	return TypedData_Make_Struct(self, Elf32_Shdr, &rb_elf32shdr_type, ptr);
 }
 
 // =============================================================================
@@ -179,7 +610,7 @@ static VALUE elf32shdr_alloc(VALUE self)
 // =============================================================================
 static VALUE rb_elf32shdr_new(void)
 {
-	return elf32shdr_alloc(rb_cElf32Sym);
+	return elf32shdr_alloc(rb_cElf32Shdr);
 }
 
 // =============================================================================
@@ -1229,6 +1660,27 @@ static VALUE elf32_get_symtab(VALUE self)
 }
 
 // =============================================================================
+// ELF32 Create Elf32_Ehdr Array from Array(Byte Array)
+// =============================================================================
+static VALUE elf32_ary2ehdrtab(VALUE self, VALUE ary)
+{
+	int i,len;
+	uint8_t *pBin;
+	Elf32_Ehdr *pEhdr;
+
+	Check_Type(ary, T_ARRAY);
+
+	len = RARRAY_LEN(ary);
+	pBin = malloc(len);
+	for(i = 0; i < len; i++) {
+		pBin[i] = NUM2CHR(rb_ary_entry(ary, i));
+	}
+
+	pEhdr = (Elf32_Ehdr *)pBin;
+	return elf32ehdr_struct2obj(pEhdr);
+}
+
+// =============================================================================
 // ELF32 Create Elf32_Shdr Array from Array(Byte Array)
 // =============================================================================
 static VALUE elf32_ary2shdrtab(VALUE self, VALUE ary)
@@ -1430,12 +1882,45 @@ void Init_elf32( void ) {
 	rb_define_method(rb_cElf32, "initialize", elf32_initialize, 1);
 	rb_define_method(rb_cElf32, "show_Ehdr", elf32_show_Ehdr, 0);
 	rb_define_method(rb_cElf32, "symtab", elf32_get_symtab, 0);
+	rb_define_singleton_method( rb_cElf32, "to_ehdrtab", elf32_ary2ehdrtab, 1);
 	rb_define_singleton_method( rb_cElf32, "to_shdrtab", elf32_ary2shdrtab, 1);
 	rb_define_singleton_method( rb_cElf32, "to_symtab", elf32_ary2symtab, 1);
 	rb_define_singleton_method( rb_cElf32, "shdrtab_to_bin", elf32_shdrtab2ary, 1);
 	rb_define_singleton_method( rb_cElf32, "symtab_to_bin", elf32_symtab2ary, 1);
 	rb_define_singleton_method( rb_cElf32, "to_reltab", elf32_ary2reltab, 1);
 	rb_define_singleton_method( rb_cElf32, "to_relatab", elf32_ary2relatab, 1);
+
+	// Initialize rb_cElf32Ehdr
+	rb_cElf32Ehdr = rb_define_class_under(rb_elfModule, "Elf32Ehdr", rb_cObject);
+    rb_define_alloc_func(rb_cElf32Ehdr, elf32ehdr_alloc);
+	rb_define_method(rb_cElf32Ehdr, "ident", elf32ehdr_get_ident, 0);
+	rb_define_method(rb_cElf32Ehdr, "ident=", elf32ehdr_set_ident, 1);
+	rb_define_method(rb_cElf32Ehdr, "type", elf32ehdr_set_type, 0);
+	rb_define_method(rb_cElf32Ehdr, "type=", elf32ehdr_get_type, 1);
+	rb_define_method(rb_cElf32Ehdr, "machine", elf32ehdr_get_machine, 0);
+	rb_define_method(rb_cElf32Ehdr, "machine=", elf32ehdr_set_machine, 1);
+	rb_define_method(rb_cElf32Ehdr, "version", elf32ehdr_get_version, 0);
+	rb_define_method(rb_cElf32Ehdr, "version=", elf32ehdr_set_version, 1);
+	rb_define_method(rb_cElf32Ehdr, "entry", elf32ehdr_get_entry, 0);
+	rb_define_method(rb_cElf32Ehdr, "entry=", elf32ehdr_set_entry, 1);
+	rb_define_method(rb_cElf32Ehdr, "phoff", elf32ehdr_get_phoff, 0);
+	rb_define_method(rb_cElf32Ehdr, "phoff=", elf32ehdr_set_phoff, 1);
+	rb_define_method(rb_cElf32Ehdr, "shoff", elf32ehdr_set_shoff, 0);
+	rb_define_method(rb_cElf32Ehdr, "shoff=", elf32ehdr_get_shoff, 1);
+	rb_define_method(rb_cElf32Ehdr, "flags", elf32ehdr_get_flags, 0);
+	rb_define_method(rb_cElf32Ehdr, "flags=", elf32ehdr_set_flags, 1);
+	rb_define_method(rb_cElf32Ehdr, "ehsize", elf32ehdr_get_ehsize, 0);
+	rb_define_method(rb_cElf32Ehdr, "ehsize=", elf32ehdr_set_ehsize, 1);
+	rb_define_method(rb_cElf32Ehdr, "phentsize", elf32ehdr_get_phentsize, 0);
+	rb_define_method(rb_cElf32Ehdr, "phentsize=", elf32ehdr_set_phentsize, 1);
+	rb_define_method(rb_cElf32Ehdr, "phnum", elf32ehdr_get_phnum, 0);
+	rb_define_method(rb_cElf32Ehdr, "phnum=", elf32ehdr_set_phnum, 1);
+	rb_define_method(rb_cElf32Ehdr, "shentsize", elf32ehdr_get_shentsize, 0);
+	rb_define_method(rb_cElf32Ehdr, "shentsize=", elf32ehdr_set_shentsize, 1);
+	rb_define_method(rb_cElf32Ehdr, "shnum", elf32ehdr_get_shnum, 0);
+	rb_define_method(rb_cElf32Ehdr, "shnum=", elf32ehdr_set_shnum, 1);
+	rb_define_method(rb_cElf32Ehdr, "shstrndx", elf32ehdr_get_shstrndx, 0);
+	rb_define_method(rb_cElf32Ehdr, "shstrndx=", elf32ehdr_set_shstrndx, 1);
 
 	// Initialize rb_cElf32Shdr
 	rb_cElf32Shdr = rb_define_class_under(rb_elfModule, "Elf32Shdr", rb_cObject);
