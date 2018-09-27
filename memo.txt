@@ -1,3 +1,18 @@
+・リンク後のモジュールでシンボルのインデックスがおかしい bad section index[  8]が出ている...
+$ readelf.exe sakura2.abs -s
+
+シンボルテーブル '.symtab' は 9 個のエントリから構成されています:
+  番号:      値 サイズ タイプ  Bind   Vis      索引名
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+     1: 00000000     0 FILE    LOCAL  DEFAULT  ABS resetprg.c
+     2: 00000012     0 SECTION LOCAL  DEFAULT    6 PResetPRG
+     3: 00000000     0 SECTION LOCAL  DEFAULT    1 SI
+     4: 00000000     0 SECTION LOCAL  DEFAULT    2 SU
+     5: 00000000     0 SECTION LOCAL  DEFAULT bad section index[  8] FIXEDVECT
+     6: 00000012    64 FUNC    GLOBAL DEFAULT    6 _main
+     7: 00000000    18 <プロセッサ固有>: 14 GLOBAL DEFAULT    6 _PowerON_Reset_PC
+     8: 00000000     4 OBJECT  GLOBAL DEFAULT bad section index[  8] _func
+     
 ・リンク後のモジュールでreadelf -s したときの Name が適切に表示されない。
 	→シンボルタイプがセクションであれば .shstrtab を参照している?。
 
