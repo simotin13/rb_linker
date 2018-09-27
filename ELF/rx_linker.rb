@@ -276,6 +276,12 @@ module ELF
 					cur_section_name_size_map[section_name] = section_info[:size]
 					cur_section_idx_name_map[sh_idx] = section_name
 
+					# 関連するセクションへのインデックスを更新
+					related_section_name = elf_object.related_section_name(section_name)
+					unless linked_section_map[related_section_name].nil?
+						section_info[:related_section_idx] = linked_section_map[related_section_name][:section_info][:idx]
+					end
+
 					# ================================================
 					# relaセクション対応
 					# relaセクションは退避してあとで情報を更新する
