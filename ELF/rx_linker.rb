@@ -439,7 +439,6 @@ module ELF
 				old_section_idx_name_map[idx] = section_name
 			end
 
-			symtab = Elf32.to_symtab(linked_section_map[".symtab"][:bin])
 			sorted_sections = linked_section_map.sort {|(key1, val1), (key2, val2)| val1[:section_info][:offset] <=> val2[:section_info][:offset] }
 			linked_section_map = {}
 			sorted_sections.each_with_index do |section, idx|
@@ -457,45 +456,51 @@ module ELF
 				section[:section_info][:related_section_idx] = linked_section_map[related_section_name][:section_info][:idx]
 			end
 
+
+			# relocate rela section
+			relocate_rela_sections(rela_section_names, linked_section_map)
+
 			# ======================================================================
 			# リンクする必要がないセクションはここで削除
 			# ======================================================================
-			iop_idx = linked_section_map["$iop"][:section_info][:idx]
+			deleted_idx_list = []
+			deleted_idx_list << linked_section_map["$iop"][:section_info][:idx]
 			linked_section_map.delete("$iop")
-			linked_section_map.each do |section_name, section|
-				idx = section[:section_info][:idx]
-				related_idx = 0
-				unless section[:section_info][:related_section_idx].nil?
-					related_idx = section[:section_info][:related_section_idx]
-				end
 
-				if iop_idx <= idx
-					section[:section_info][:idx] -= 1
-				end
-				if iop_idx <= related_idx
-					section[:section_info][:related_section_idx] -= 1
-				end
+			# リロケーション済みなので.rel(a)セクションを削除
+			rela_section_names.each do |rela_section_name|
+				deleted_idx_list << linked_section_map[rela_section_name][:section_info][:idx]
+				linked_section_map.delete(rela_section_name)
 			end
 
 			# ソート結果に合わせてシンボルテーブルの参照インデックスを更新
+			linked_section_map.each do |name, section|
+				deleted_idx_list.each do |deleted_idx|
+					if deleted_idx <= section[:section_info][:idx]
+						section[:section_info][:idx] -= 1
+					end
+					if deleted_idx <= section[:section_info][:related_section_idx]
+						section[:section_info][:related_section_idx] -= 1
+					end
+				end
+			end
+
+			symtab = Elf32.to_symtab(linked_section_map[".symtab"][:bin])
 			symtab.each do |sym|
 				if sym.has_ref_section?
 					ref_section_name = old_section_idx_name_map[sym.st_shndx]
 					new_idx = linked_section_map[ref_section_name][:section_info][:idx]
 					sym.st_shndx = new_idx
+					deleted_idx_list.each do |deleted_idx|
+						if deleted_idx <= sym.st_shndx
+							sym.st_shndx -=1
+						end
+					end
 				end
 			end
+
 			# シンボルテーブル更新結果を上書き
 			linked_section_map[".symtab"][:bin] = Elf32.symtab_to_bin(symtab)
-
-			# relocate rela section
-			relocate_rela_sections(rela_section_names, linked_section_map)
-
-			# リンク不要なセクションをここで削除
-			# 多分インデックスはここ以降ではされないはず
-			rela_section_names.each do |rela_section_name|
-				linked_section_map.delete(rela_section_name)
-			end
 
 			# ========================================================================
 			# make program header
