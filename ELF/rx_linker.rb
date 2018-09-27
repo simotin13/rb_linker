@@ -450,6 +450,13 @@ module ELF
 				linked_section_map[section_name][:section_info][:idx] = idx
 			end
 
+			# ソート後のセクションインデックスで関連するセクションインデックスを更新する
+			linked_section_map.each do |section_name, section|
+				related_section_idx = section[:section_info][:related_section_idx]
+				related_section_name = old_section_idx_name_map[related_section_idx]
+				section[:section_info][:related_section_idx] = linked_section_map[related_section_name][:section_info][:idx]
+			end
+
 			# ======================================================================
 			# リンクする必要がないセクションはここで削除
 			# ======================================================================
@@ -467,15 +474,6 @@ module ELF
 				end
 				if iop_idx <= related_idx
 					section[:section_info][:related_section_idx] -= 1
-				end
-			end
-
-			# $iop の削除に伴い、related_idxの更新を行う
-			linked_section_map.each do |section_name, section|
-				idx = section[:section_info][:idx]
-				related_idx = 0
-				unless section[:section_info][:related_section_idx].nil?
-					related_idx = section[:section_info][:related_section_idx]
 				end
 			end
 
