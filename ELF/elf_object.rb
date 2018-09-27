@@ -182,6 +182,12 @@ module ELF
 			end
 		end
 
+		def related_section_name(src_section_name)
+			related_idx = @section_h_map[src_section_name][:related_section_idx]
+			related_section = @section_h_map.find{|key,val| val[:idx] == related_idx}
+			related_section[1][:name]
+		end
+
 	private
 
 		# ============================================================================
@@ -483,7 +489,7 @@ module ELF
 			@symbol_table = get_symtab_section(@section_h_map[".symtab"], @string_map)
 
 			# DEBUG
-			show_symbol_table(@symbol_table)
+			#show_symbol_table(@symbol_table)
 
 			# get relocation section info(.rela.*, .rel.*)
 			@rel_sections = {}
