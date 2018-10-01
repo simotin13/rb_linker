@@ -1,0 +1,85 @@
+Renesas Optimizing Linker (W2.06.00 )             01-Oct-2018 17:03:11
+
+*** Options ***
+
+-subcommand=DefaultBuild\sample.clnk
+-library=DefaultBuild\sample.lib
+-input=DefaultBuild\dbsct.obj
+-input=DefaultBuild\intprg.obj
+-input=DefaultBuild\resetprg.obj
+-input=DefaultBuild\sample.obj
+-input=DefaultBuild\sbrk.obj
+-input=DefaultBuild\vecttbl.obj
+-noprelink
+-output=DefaultBuild\sample.abs
+-list=DefaultBuild\sample.map
+-nooptimize
+-start=B_1,R_1,B_2,R_2,B,R,SU,SI/04,PResetPRG/0FFF00000,C_1,C_2,C,C$DSEC,C$BSEC,C$INIT,C$VTBL,C$VECT,D_1,D_2,D,P,PIntPRG,W_1,W_2,W,L/0FFF00100,FIXEDVECT/0FFFFFFD0
+-rom=D=R,D_1=R_1,D_2=R_2
+-nologo
+-end
+
+*** Error information ***
+
+*** Mapping List ***
+
+SECTION                            START      END         SIZE   ALIGN
+
+B_1
+                                  00000004  00000004         0   1
+R_1
+                                  00000004  00000004         0   1
+B_2
+                                  00000004  00000004         0   1
+R_2
+                                  00000004  00000004         0   1
+B
+                                  00000004  00000403       400   4
+R
+                                  00000404  00000407         4   4
+SU
+                                  00000408  00000507       100   4
+SI
+                                  00000508  00000807       300   4
+PResetPRG
+                                  fff00000  fff00030        31   1
+C_1
+                                  fff00100  fff00100         0   1
+C_2
+                                  fff00100  fff00100         0   1
+C
+                                  fff00100  fff00133        34   4
+C$DSEC
+                                  fff00134  fff00157        24   4
+C$BSEC
+                                  fff00158  fff0016f        18   4
+C$INIT
+                                  fff00170  fff00170         0   1
+C$VTBL
+                                  fff00170  fff00170         0   1
+C$VECT
+                                  fff00170  fff0056f       400   4
+D_1
+                                  fff00570  fff00570         0   1
+D_2
+                                  fff00570  fff00570         0   1
+D
+                                  fff00570  fff00573         4   4
+P
+                                  fff00574  fff005df        6c   1
+PIntPRG
+                                  fff005e0  fff0077d       19e   1
+W_1
+                                  fff0077e  fff0077e         0   1
+W_2
+                                  fff0077e  fff0077e         0   1
+W
+                                  fff0077e  fff0077e         0   1
+L
+                                  fff0077e  fff0077e         0   1
+$ADDR_C_FFFFFF80
+                                  ffffff80  ffffff83         4   1
+$ADDR_C_FFFFFFA0
+                                  ffffffa0  ffffffaf        10   1
+FIXEDVECT
+                                  ffffffd0  ffffffff        30   4
