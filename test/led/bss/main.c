@@ -1,7 +1,8 @@
 #include "iodefine.h"
-#pragma section ResetPRG
 
 static int count;
+
+#pragma section ResetPRG
 void main(void)
 {
     volatile int i;

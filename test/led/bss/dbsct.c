@@ -46,12 +46,16 @@ extern const struct {
 ** CTBL prevents excessive output of L1100 messages when linking.
 ** Even if CTBL is deleted, the operation of the program does not change.
 */
+// delete 
 _UBYTE * const _CTBL[] = {
     __sectop("C_1"), __sectop("C_2"), __sectop("C"),
     __sectop("W_1"), __sectop("W_2"), __sectop("W"),
     __sectop("L"), __sectop("SU"),
-    __sectop("C$DSEC"), __sectop("C$BSEC"),
-    __sectop("C$INIT"), __sectop("C$VTBL"), __sectop("C$VECT"),
+    __sectop("C$DSEC"),
+    __sectop("C$BSEC"),
+    // __sectop("C$INIT"),
+    // __sectop("C$VTBL"),
+    // __sectop("C$VECT"),
 };
 
 #pragma packoption
